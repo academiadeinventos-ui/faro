@@ -1,0 +1,1963 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0C10">
+<meta name="description" content="Faro: asistente de voz para personas ciegas o con baja visión. Cámara, lectura de textos, conversación y juegos, todo con la voz.">
+<title>Faro · Asistente de voz para personas ciegas</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0A0C10; --surface:#141821; --surface2:#1E2532; --line:#343f54;
+  --text:#F6F8FB; --muted:#B7C2D2;
+  --amber:#FFC233; --amber-ink:#191100;
+  --mint:#46E3A6; --mint-ink:#00190F;
+  --red:#FF7A7A;
+  --radius:18px;
+  font-size:112.5%;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.45;-webkit-text-size-adjust:100%;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+.ic{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.app{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;max-width:720px;margin:0 auto}
+
+/* ---------- Cabecera ---------- */
+.top{display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;padding-top:max(.6rem,env(safe-area-inset-top))}
+.brand{display:flex;align-items:center;gap:.4rem;margin:0;font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
+.brand svg{width:34px;height:34px}
+.state{margin:0 0 0 auto;display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .75rem;border:1.5px solid var(--line);border-radius:999px;font-size:.85rem;font-weight:700;color:var(--muted);white-space:nowrap}
+.state::before{content:"";width:.6rem;height:.6rem;border-radius:50%;background:currentColor}
+body[data-state=listening] .state{color:var(--mint);border-color:var(--mint)}
+body[data-state=speaking] .state,body[data-state=thinking] .state{color:var(--amber);border-color:var(--amber)}
+.icon-btn{width:48px;height:48px;flex:none;display:grid;place-items:center;border-radius:14px;border:1.5px solid var(--line);background:var(--surface)}
+
+/* ---------- Escenario: cámara y tarjetas ---------- */
+.stage{padding:0 .9rem;max-height:48vh;max-height:48dvh;overflow:auto}
+.stage.has-card{max-height:calc(100vh - 17.5rem);max-height:calc(100dvh - 17.5rem)}
+.stage.has-card .cam{height:54px}
+.stage.has-card .cam-bar{top:5px}
+.stage>*{margin-bottom:.6rem}
+.cam{position:relative;height:clamp(140px,26vh,250px);border-radius:var(--radius);overflow:hidden;background:#000;border:1.5px solid var(--line)}
+.cam video,.cam canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam video.mirror{transform:scaleX(-1)}
+.cam-bar{position:absolute;left:.5rem;right:.5rem;top:.5rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.pill{display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .75rem;border-radius:999px;background:rgba(10,12,16,.85);font-size:.85rem;font-weight:700;white-space:nowrap}
+.pill::before{content:"";width:.6rem;height:.6rem;border-radius:50%;background:var(--red)}
+.cam-off{min-height:44px;padding:0 .9rem;border-radius:999px;border:0;background:rgba(10,12,16,.85);font-size:.85rem;font-weight:700;white-space:nowrap}
+body.exploring .cam{border-color:var(--amber)}
+
+.card{padding:.9rem;border-radius:var(--radius);background:var(--surface);border:1.5px solid var(--line)}
+.card-title{margin:0 0 .7rem;font-size:1.05rem;line-height:1.3}
+.choices{display:grid;gap:.5rem}
+.choices.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.choices.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.choices.menu .choice{display:block;padding:.45rem .6rem;font-size:.92rem;overflow-wrap:anywhere}
+.choices.menu .num{display:inline-grid;vertical-align:middle;width:1.6rem;height:1.6rem;margin-right:.4rem;font-size:.85rem}
+.choice{display:flex;align-items:center;gap:.6rem;min-height:54px;padding:.55rem .75rem;border-radius:14px;border:1.5px solid var(--line);background:var(--surface2);font-weight:700;text-align:left;line-height:1.2}
+.choice.tile{flex-direction:column;justify-content:center;min-height:92px;text-align:center;gap:.4rem}
+.choice.tile .ic{width:30px;height:30px;color:var(--amber)}
+.choice .num{flex:none;display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;background:var(--amber);color:var(--amber-ink);font-size:.95rem;font-weight:800}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.6rem}
+.card-head .card-title{flex:1;min-width:0;margin:0}
+.ghost{flex:none;min-height:44px;padding:0 .8rem;border-radius:12px;border:1.5px dashed var(--line);background:none;color:var(--muted);font-size:.85rem;font-weight:700}
+.pads{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
+.pad{min-height:84px;border-radius:16px;border:2px solid var(--line);background:var(--surface2);font-size:1.8rem;font-weight:800;transition:background .08s,color .08s,border-color .08s}
+.pad small{display:block;font-size:.8rem;font-weight:700;color:var(--muted)}
+.pad.lit{background:var(--amber);border-color:var(--amber);color:var(--amber-ink)}
+.pad.lit small{color:var(--amber-ink)}
+
+/* ---------- Conversación ---------- */
+.log{display:flex;flex-direction:column;gap:.55rem;padding:.8rem .9rem;overflow:auto;overscroll-behavior:contain}
+.msg{max-width:88%;padding:.65rem .85rem;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.bot{align-self:flex-start;background:var(--surface);border:1.5px solid var(--line);border-bottom-left-radius:5px}
+.msg.user{align-self:flex-end;background:var(--amber);color:var(--amber-ink);font-weight:650;border-bottom-right-radius:5px}
+.msg.note{align-self:center;max-width:100%;padding:.15rem .6rem;font-size:.85rem;color:var(--muted);text-align:center}
+
+/* ---------- Barra inferior ---------- */
+.dock{display:grid;grid-template-columns:minmax(0,1fr);gap:.55rem;padding:.6rem .9rem max(.8rem,env(safe-area-inset-bottom));border-top:1.5px solid var(--line);background:#0D1016}
+.heard{font-size:.95rem;font-weight:650;color:var(--mint)}
+.heard:empty{display:none}
+.quick{display:flex;gap:.5rem;margin:0 -.9rem;padding:2px .9rem;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding:0 .9rem}
+.quick::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:.5rem;min-height:50px;padding:0 .95rem;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);font-size:.95rem;font-weight:700;white-space:nowrap;scroll-snap-align:start}
+.chip .ic{width:22px;height:22px;color:var(--amber)}
+.composer{display:flex;gap:.5rem}
+.composer input{flex:1;min-width:0;min-height:52px;padding:0 .9rem;border-radius:14px;border:1.5px solid var(--line);background:var(--surface)}
+.composer input::placeholder{color:#93a0b6}
+.composer button{flex:none;display:grid;place-items:center;width:56px;min-height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface2)}
+.mic{display:flex;align-items:center;justify-content:center;gap:.9rem;min-height:92px;padding:.5rem 1rem;border:0;border-radius:24px;background:var(--amber);color:var(--amber-ink);transition:background .15s,transform .08s}
+.mic:active{transform:scale(.985)}
+.mic-ico{flex:none;display:grid;place-items:center;width:54px;height:54px;border-radius:50%;background:rgba(0,0,0,.15)}
+.mic-ico .ic{width:28px;height:28px}
+.mic-txt{display:grid;min-width:0;text-align:left;line-height:1.15}
+.mic-txt b{font-size:1.3rem;font-weight:800}
+.mic-txt small{font-size:.85rem;font-weight:650;opacity:.85}
+body[data-state=listening] .mic{background:var(--mint);color:var(--mint-ink)}
+body[data-state=listening] .mic-ico{animation:pulse 1.2s ease-out infinite}
+body[data-state=speaking] .mic,body[data-state=thinking] .mic{background:var(--surface2);color:var(--text);box-shadow:inset 0 0 0 2px var(--amber)}
+body[data-state=speaking] .mic-ico,body[data-state=thinking] .mic-ico{background:rgba(255,194,51,.16);color:var(--amber)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,25,15,.5)}100%{box-shadow:0 0 0 20px rgba(0,25,15,0)}}
+
+/* ---------- Pantalla de inicio ---------- */
+.start{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:2rem;border:0;background:radial-gradient(120% 75% at 50% 0%,#1D2538 0%,var(--bg) 62%);color:var(--text);text-align:center}
+.start svg{width:132px;height:132px;margin-bottom:.4rem}
+.start .beam{transform-origin:24px 17px;animation:beam 3.6s ease-in-out infinite}
+.start-title{font-size:3.2rem;font-weight:850;letter-spacing:-.04em;line-height:1}
+.start-sub{max-width:24ch;font-size:1.1rem;color:var(--muted)}
+.start-cta{margin-top:1.8rem;padding:1rem 1.6rem;border-radius:999px;background:var(--amber);color:var(--amber-ink);font-size:1.2rem;font-weight:800}
+@keyframes beam{0%,100%{opacity:.25}50%{opacity:.75}}
+
+/* ---------- Ajustes ---------- */
+dialog{width:min(560px,calc(100vw - 1.2rem));max-height:calc(100vh - 1.2rem);max-height:calc(100dvh - 1.2rem);padding:0;border:1.5px solid var(--line);border-radius:22px;background:var(--surface);color:var(--text)}
+dialog::backdrop{background:rgba(0,0,0,.72)}
+.set-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem 1rem;background:var(--surface);border-bottom:1.5px solid var(--line)}
+.set-head h2{margin:0;font-size:1.2rem}
+.set-body{padding:0 1rem 1rem}
+fieldset{margin:1.1rem 0 0;padding:0;border:0;min-width:0}
+legend{padding:0;margin-bottom:.2rem;font-size:.8rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:58px;padding:.45rem 0;border-bottom:1px solid var(--line)}
+.stack{display:grid;gap:.4rem;padding:.6rem 0;border-bottom:1px solid var(--line)}
+.row label,.stack label{font-weight:650}
+.row small,.stack small{display:block;font-size:.82rem;font-weight:400;color:var(--muted)}
+.row select,.row input[type=range]{flex:none;width:46%}
+.row.wide{flex-direction:column;align-items:stretch;gap:.4rem;padding:.65rem 0}
+.row.wide select,.row.wide .btn{width:100%}
+.btn{white-space:nowrap}
+select,.stack input{min-height:48px;padding:0 .7rem;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);width:100%}
+input[type=range]{accent-color:var(--amber);min-height:44px}
+.switch{appearance:none;-webkit-appearance:none;flex:none;position:relative;width:58px;height:34px;margin:0;border-radius:999px;background:#445067;cursor:pointer;transition:background .15s}
+.switch::after{content:"";position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch:checked{background:var(--amber)}
+.switch:checked::after{transform:translateX(24px);background:var(--amber-ink)}
+.btn{min-height:46px;padding:0 1rem;border-radius:12px;border:1.5px solid var(--line);background:var(--surface2);font-weight:700}
+.fine{margin:1rem 0 0;font-size:.85rem;color:var(--muted)}
+.fine a{color:var(--amber)}
+
+@media (max-width:360px){:root{font-size:100%}.top{gap:.4rem;padding-left:.7rem;padding-right:.7rem}.stage{padding:0 .7rem}.mic{gap:.6rem;padding:.5rem .7rem}.mic-txt b{font-size:1.15rem}}
+@media (max-height:600px){.mic{min-height:72px}.mic-ico{width:46px;height:46px}.chip{min-height:46px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body data-state="idle">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-usb" viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 6h16M4 11h16M4 16h10"/></symbol>
+    <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-6"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6 6.2 6 10.5a6 6 0 0 1-12 0C6 9.2 12 3 12 3z"/></symbol>
+    <symbol id="i-game" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8.5 8.5h.01M15.5 8.5h.01M8.5 15.5h.01M15.5 15.5h.01M12 12h.01"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8M12 17h.01"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-set" viewBox="0 0 24 24"><path d="M4 7h8M18 7h2M4 17h2M12 17h8"/><circle cx="15" cy="7" r="2.5"/><circle cx="9" cy="17" r="2.5"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 48 48"><path class="beam" d="M29 17l16-7v14z" fill="#FFC233" opacity=".45"/><path class="beam" d="M19 17L3 10v14z" fill="#FFC233" opacity=".45"/><path d="M18.5 44l3-21h5l3 21z" fill="#F6F8FB"/><path d="M20.2 32h7.6l.6 4h-8.8z" fill="#0A0C10" opacity=".55"/><rect x="19.5" y="13" width="9" height="9" rx="1.5" fill="#FFC233"/><path d="M17.5 13.5L24 6l6.5 7.5z" fill="#F6F8FB"/><rect x="13" y="43" width="22" height="3" rx="1.5" fill="#F6F8FB"/></symbol>
+  </defs>
+</svg>
+
+<button id="start" class="start" type="button">
+  <svg aria-hidden="true"><use href="#i-logo"/></svg>
+  <span class="start-title">Faro</span>
+  <span class="start-sub">Asistente de voz para personas ciegas o con baja visión</span>
+  <span class="start-cta">Toca la pantalla para comenzar</span>
+</button>
+
+<div class="app">
+  <header class="top">
+    <h1 class="brand"><svg aria-hidden="true"><use href="#i-logo"/></svg>Faro</h1>
+    <p id="state" class="state">En espera</p>
+    <button id="btnSettings" class="icon-btn" type="button" aria-label="Abrir ajustes"><svg class="ic" aria-hidden="true"><use href="#i-set"/></svg></button>
+  </header>
+
+  <section class="stage" aria-label="Cámara y opciones">
+    <div id="camPanel" class="cam" hidden>
+      <video id="video" playsinline muted autoplay aria-label="Imagen de la cámara"></video>
+      <canvas id="overlay" aria-hidden="true"></canvas>
+      <div class="cam-bar">
+        <span id="camLabel" class="pill">Cámara</span>
+        <button class="cam-off" type="button" data-say="apagar cámara" aria-label="Apagar cámara">Apagar</button>
+      </div>
+    </div>
+    <div id="card" class="card" hidden></div>
+  </section>
+
+  <main id="log" class="log" role="log" aria-label="Conversación" aria-live="off" tabindex="0"></main>
+
+  <footer class="dock">
+    <div id="heard" class="heard" aria-hidden="true"></div>
+    <nav class="quick" aria-label="Funciones rápidas">
+      <button class="chip" type="button" data-say="activar cámara"><svg class="ic" aria-hidden="true"><use href="#i-cam"/></svg>Cámara</button>
+      <button class="chip" type="button" data-say="¿qué ves?"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg>¿Qué ves?</button>
+      <button class="chip" type="button" data-say="leer texto"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg>Leer texto</button>
+      <button class="chip" type="button" data-say="explorar"><svg class="ic" aria-hidden="true"><use href="#i-radar"/></svg>Explorar</button>
+      <button class="chip" type="button" data-say="¿qué color es?"><svg class="ic" aria-hidden="true"><use href="#i-drop"/></svg>Color</button>
+      <button class="chip" type="button" data-say="jugar"><svg class="ic" aria-hidden="true"><use href="#i-game"/></svg>Juegos</button>
+      <button class="chip" type="button" data-say="ayuda"><svg class="ic" aria-hidden="true"><use href="#i-help"/></svg>Ayuda</button>
+      <button class="chip" type="button" data-say="detener"><svg class="ic" aria-hidden="true"><use href="#i-stop"/></svg>Detener</button>
+    </nav>
+    <div class="composer" role="group" aria-label="Escribir un mensaje">
+      <label class="sr-only" for="txt">Escribe un mensaje para Faro</label>
+      <input id="txt" type="text" enterkeyhint="send" autocomplete="off" autocapitalize="sentences" placeholder="Escribe aquí…">
+      <button id="send" type="button" aria-label="Enviar mensaje"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg></button>
+    </div>
+    <button id="mic" class="mic" type="button" aria-pressed="false">
+      <span class="mic-ico"><svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg></span>
+      <span class="mic-txt"><b id="micTitle">Toca para hablar</b><small id="micSub">o escribe arriba</small></span>
+    </button>
+  </footer>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <div class="set-head">
+    <h2 id="dlgTitle">Ajustes</h2>
+    <button id="dlgClose" class="btn" type="button">Cerrar</button>
+  </div>
+  <div class="set-body">
+    <fieldset>
+      <legend>Voz de Faro</legend>
+      <div class="row"><label for="sVoice">Faro habla en voz alta<small>Apágalo si usas TalkBack o VoiceOver.</small></label><input id="sVoice" class="switch" type="checkbox" role="switch"></div>
+      <div class="row"><label for="sRate">Velocidad</label><input id="sRate" type="range" min="0.6" max="1.8" step="0.1"></div>
+      <div class="row wide"><label for="sVoiceSel">Voz</label><select id="sVoiceSel"></select></div>
+      <div class="row wide"><button id="sTest" class="btn" type="button">Probar la voz</button></div>
+    </fieldset>
+    <fieldset>
+      <legend>Escucha</legend>
+      <div class="row wide"><label for="sLang">Acento que escucho</label><select id="sLang"></select></div>
+      <div class="row"><label for="sAuto">Seguir escuchando después de responder<small>Para conversar sin tocar el botón cada vez.</small></label><input id="sAuto" class="switch" type="checkbox" role="switch"></div>
+      <div class="row"><label for="sHands">Manos libres<small>Escucha todo el tiempo. Gasta más batería.</small></label><input id="sHands" class="switch" type="checkbox" role="switch"></div>
+      <div class="row"><label for="sVib">Vibración</label><input id="sVib" class="switch" type="checkbox" role="switch"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Inteligencia artificial</legend>
+      <div class="row wide"><label for="sAI">Conversación</label><select id="sAI"><option value="auto">IA gratis en línea</option><option value="local">Solo en el dispositivo</option></select></div>
+      <div class="stack"><label for="sKey">Clave de Gemini (opcional)<small>Con una clave gratuita de Google AI Studio, Faro describe escenas completas y lee mejor los textos. Se guarda solo en este dispositivo.</small></label><input id="sKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí la clave"></div>
+      <div class="stack"><label for="sModel">Modelo de Gemini</label><input id="sModel" type="text" autocomplete="off" spellcheck="false"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Emergencia</legend>
+      <div class="stack"><label for="sSos">Teléfono de contacto<small>Al decir «emergencia» se abre el marcador con este número.</small></label><input id="sSos" type="tel" inputmode="tel" autocomplete="off" placeholder="+56 9 1234 5678"></div>
+    </fieldset>
+    <p class="fine">Faro reconoce objetos comunes y puede equivocarse. No reemplaza al bastón, al perro guía ni a la ayuda de otra persona. La visión del dispositivo usa TensorFlow.js y Tesseract.js; la conversación sin clave usa los servicios gratuitos LLM7 y Pollinations.</p>
+  </div>
+</dialog>
+
+<noscript><p style="padding:2rem">Faro necesita JavaScript para funcionar.</p></noscript>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   1. UTILIDADES
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rand = n => Math.floor(Math.random() * n);
+const pick = a => a[rand(a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === 'class') n.className = v;
+    else if (k === 'html') n.innerHTML = v;
+    else n.setAttribute(k, v);
+  }
+  n.append(...kids);
+  return n;
+}
+const icon = id => `<svg class="ic" aria-hidden="true"><use href="#${id}"/></svg>`;
+
+/** Texto en minúsculas, sin tildes ni signos: es lo que se compara con los comandos. */
+function norm(s) {
+  return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+/** Igual que norm, pero conserva la ñ (para el juego de palabras). */
+function normWord(s) {
+  return String(s).toLowerCase().replace(/ñ/g, '\u0001').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u0001/g, 'ñ').replace(/[^a-zñ\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+/** Quita markdown y emojis de las respuestas de la IA: se van a leer en voz alta. */
+function plain(s) {
+  s = String(s).replace(/```[\s\S]*?```/g, ' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_#`>~|]/g, '').replace(/^\s*[-•]\s+/gm, '');
+  try { s = s.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, ''); } catch (e) {}
+  return s.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+}
+
+const N_UNITS = { cero:0, un:1, uno:1, una:1, dos:2, tres:3, cuatro:4, cinco:5, seis:6, siete:7, ocho:8, nueve:9, diez:10, once:11, doce:12, trece:13, catorce:14, quince:15, dieciseis:16, diecisiete:17, dieciocho:18, diecinueve:19, veinte:20, veintiun:21, veintiuno:21, veintiuna:21, veintidos:22, veintitres:23, veinticuatro:24, veinticinco:25, veintiseis:26, veintisiete:27, veintiocho:28, veintinueve:29 };
+const N_TENS = { treinta:30, cuarenta:40, cincuenta:50, sesenta:60, setenta:70, ochenta:80, noventa:90 };
+const N_HUND = { cien:100, ciento:100, doscientos:200, trescientos:300, cuatrocientos:400, quinientos:500, seiscientos:600, setecientos:700, ochocientos:800, novecientos:900 };
+/** Entiende "52", "cincuenta y dos", "ciento veinte", "dos mil". Devuelve null si no hay número. */
+function parseNumber(text) {
+  const t = norm(text);
+  const d = t.match(/\d+/);
+  if (d) return parseInt(d[0], 10);
+  let total = 0, thousands = 0, found = false, article = false;
+  for (const w of t.split(' ')) {
+    if (w === 'un' || w === 'una') { article = true; continue; }
+    if (w in N_HUND) { total += N_HUND[w]; found = true; }
+    else if (w in N_TENS) { total += N_TENS[w]; found = true; }
+    else if (w in N_UNITS) { total += N_UNITS[w]; found = true; }
+    else if (w === 'mil') { thousands = (total || 1) * 1000; total = 0; found = true; }
+  }
+  if (found) return thousands + total;
+  return article ? 1 : null;
+}
+const NUM_LABEL = ['Cero', 'Uno', 'Dos', 'Tres', 'Cuatro', 'Cinco', 'Seis', 'Siete', 'Ocho', 'Nueve', 'Diez'];
+const numWord = (n, fem) => n === 1 ? (fem ? 'una' : 'un') : (NUM_LABEL[n] ? NUM_LABEL[n].toLowerCase() : String(n));
+function listJoin(items) {
+  if (items.length < 2) return items.join('');
+  return items.slice(0, -1).join('; ') + ' y ' + items[items.length - 1];
+}
+
+const YES_RE = /^(si|sip|sipo|claro|dale|ya|bueno|ok|okay|okey|vale|por supuesto|obvio|vamos|venga|otra|de nuevo|juguemos|quiero|a jugar)\b/;
+const NO_RE = /^(no|nop|nel|ya no|para nada|basta|suficiente|salir|terminar|despues|otro dia|cancelar)\b/;
+const CANCEL_RE = /^(cancelar|cancela|cancelalo|nada|ninguna|ninguno|olvidalo|dejalo|no importa|no|salir)$/;
+const STOP_RE = /^(silencio|callate|calla|shh+|para|parar|detente|detener|deten|basta|alto|stop)( faro| ya| por favor| todo)*$/;
+const REPEAT_RE = /^(repite|repitelo|repitemelo|repetir|repita|puedes repetir|que dijiste|como dijiste|no (te )?(entendi|escuche))\b/;
+const EXIT_GAME_RE = /^(salir|sal|salgamos|terminar|termina|fin)$|\b(salir|sal|salgamos|terminar|termina|terminemos|dejar|deja|dejemos|acabar|parar) (del |el |de |este |la )?(juego|jugar|partida)\b|\b(no quiero|ya no quiero) (jugar|seguir)\b|\bvolver al inicio\b|\bmenu principal\b/;
+
+/* =====================================================================
+   2. AJUSTES GUARDADOS
+   ===================================================================== */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('faro.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('faro.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+const LANGS = [['es-CL', 'Chile'], ['es-AR', 'Argentina'], ['es-BO', 'Bolivia'], ['es-CO', 'Colombia'], ['es-EC', 'Ecuador'], ['es-ES', 'España'], ['es-US', 'Estados Unidos'], ['es-MX', 'México'], ['es-PE', 'Perú'], ['es-UY', 'Uruguay'], ['es-VE', 'Venezuela']];
+const browserLang = (LANGS.find(l => l[0].toLowerCase() === String(navigator.language || '').toLowerCase()) || LANGS[0])[0];
+const cfg = Object.assign({
+  voice: true, rate: 1, voiceURI: '', lang: browserLang,
+  autoListen: true, handsFree: false, vibrate: true,
+  ai: 'auto', geminiKey: '', geminiModel: 'gemini-flash-latest', sos: ''
+}, store.get('cfg', {}));
+const saveCfg = () => store.set('cfg', cfg);
+
+/* =====================================================================
+   3. ELEMENTOS Y ESTADO
+   ===================================================================== */
+const els = {
+  start: $('#start'), mic: $('#mic'), micTitle: $('#micTitle'), micSub: $('#micSub'), state: $('#state'),
+  log: $('#log'), txt: $('#txt'), heard: $('#heard'),
+  camPanel: $('#camPanel'), video: $('#video'), overlay: $('#overlay'), camLabel: $('#camLabel'),
+  card: $('#card'), dlg: $('#dlg')
+};
+const S = { started: false, pending: null, game: null, op: 0, lastSaid: '', exploring: false, camCount: null, camPerm: false, tips: {} };
+const ui = { state: 'idle' };
+let lastSource = 'button';
+
+const STATE_TEXT = {
+  idle: ['En espera', 'Toca para hablar', 'o escribe arriba'],
+  listening: ['Escuchando', 'Escuchando…', 'habla ahora'],
+  speaking: ['Hablando', 'Hablando…', 'toca para interrumpir'],
+  thinking: ['Pensando', 'Pensando…', 'un momento']
+};
+function setState(s) {
+  ui.state = s;
+  document.body.dataset.state = s;
+  const [chip, title, sub] = STATE_TEXT[s];
+  els.state.textContent = chip;
+  els.micTitle.textContent = title;
+  els.micSub.textContent = (s === 'idle' && !Ear.supported) ? 'voz no disponible: escribe arriba' : sub;
+  els.mic.setAttribute('aria-pressed', s === 'listening' ? 'true' : 'false');
+}
+
+function addMsg(role, text) {
+  const d = el('div', { class: 'msg ' + role });
+  if (role !== 'note') d.append(el('span', { class: 'sr-only' }, role === 'bot' ? 'Faro: ' : 'Tú: '));
+  d.append(document.createTextNode(text));
+  els.log.append(d);
+  while (els.log.children.length > 120) els.log.firstElementChild.remove();
+  els.log.scrollTop = els.log.scrollHeight;
+}
+const note = text => addMsg('note', text);
+
+function showCard(node) { els.card.replaceChildren(node); els.card.hidden = false; els.card.parentNode.classList.add('has-card'); els.card.parentNode.scrollTop = 0; }
+function hideCard() { els.card.hidden = true; els.card.replaceChildren(); els.card.parentNode.classList.remove('has-card'); }
+function choiceCard(title, options, { cols = 1, cancel = true, tiles = false, menu = false } = {}) {
+  const list = el('div', { class: 'choices cols-' + cols + (menu ? ' menu' : '') });
+  for (const o of options) {
+    const b = el('button', { type: 'button', class: 'choice' + (tiles ? ' tile' : ''), 'data-say': o.say });
+    if (o.icon) b.insertAdjacentHTML('beforeend', icon(o.icon));
+    if (o.num) b.append(el('span', { class: 'num', 'aria-hidden': 'true' }, o.num));
+    b.append(el('span', {}, o.label));
+    list.append(b);
+  }
+  const head = el('div', { class: 'card-head' }, el('h2', { class: 'card-title' }, title));
+  if (cancel) head.append(el('button', { type: 'button', class: 'ghost', 'data-say': 'cancelar' }, 'Cancelar'));
+  return el('div', {}, head, list);
+}
+
+/* =====================================================================
+   4. SONIDOS Y VIBRACIÓN
+   ===================================================================== */
+const Sound = {
+  ctx: null,
+  init() {
+    if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) { try { this.ctx = new AC(); } catch (e) {} } }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+  },
+  tone(freq, dur = .15, { type = 'sine', gain = .18, when = 0 } = {}) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime + when, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + .015);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .03);
+  },
+  listen() { this.tone(660, .09); this.tone(990, .12, { when: .09 }); },
+  done() { this.tone(520, .09, { gain: .12 }); this.tone(392, .12, { gain: .12, when: .09 }); },
+  ok() { this.tone(660, .1); this.tone(880, .1, { when: .1 }); this.tone(1320, .2, { when: .2 }); },
+  bad() { this.tone(220, .22, { type: 'triangle', gain: .25 }); this.tone(165, .3, { type: 'triangle', gain: .25, when: .2 }); },
+  tick() { this.tone(440, .05, { gain: .07 }); }
+};
+function buzz(pattern) { if (cfg.vibrate && navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} } }
+
+let thinkTimer = null;
+function startThinking() { setState('thinking'); clearInterval(thinkTimer); thinkTimer = setInterval(() => Sound.tick(), 1400); }
+function stopThinking() { clearInterval(thinkTimer); thinkTimer = null; if (ui.state === 'thinking') setState('idle'); }
+
+/* =====================================================================
+   5. VOZ: HABLAR
+   ===================================================================== */
+const TTS = {
+  ok: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
+  voices: [], token: 0, speaking: false, _u: null,
+  load() {
+    if (!this.ok) return;
+    const read = () => { this.voices = speechSynthesis.getVoices().filter(v => /^es([-_]|$)/i.test(v.lang)); fillVoiceSelect(); };
+    read();
+    if (speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', read);
+  },
+  voice() {
+    const vs = this.voices; if (!vs.length) return null;
+    if (cfg.voiceURI) { const v = vs.find(v => v.voiceURI === cfg.voiceURI); if (v) return v; }
+    for (const want of [cfg.lang, 'es-CL', 'es-419', 'es-US', 'es-MX', 'es-AR', 'es-ES']) {
+      const v = vs.find(v => v.lang.replace('_', '-').toLowerCase() === want.toLowerCase()); if (v) return v;
+    }
+    return vs[0];
+  },
+  /** Trozos cortos: algunos navegadores cortan las frases largas. */
+  chunks(text) {
+    text = text.replace(/([^.!?:…])\n+/g, '$1. ').replace(/\n+/g, ' ');
+    const bits = text.split(/([.!?…]+)\s+/), sents = [], out = [];
+    for (let i = 0; i < bits.length; i += 2) { const s = ((bits[i] || '') + (bits[i + 1] || '')).trim(); if (s) sents.push(s); }
+    let cur = '';
+    for (let s of sents) {
+      while (s.length > 220) {
+        let cut = s.lastIndexOf(',', 220); if (cut < 80) cut = s.lastIndexOf(' ', 220); if (cut < 1) cut = 220;
+        if (cur) { out.push(cur); cur = ''; }
+        out.push(s.slice(0, cut + 1).trim()); s = s.slice(cut + 1).trim();
+      }
+      if (!s) continue;
+      if (cur && (cur.length + s.length + 1) > 220) { out.push(cur); cur = s; } else cur = cur ? cur + ' ' + s : s;
+    }
+    if (cur) out.push(cur);
+    return out;
+  },
+  /** Resuelve true si terminó de hablar, false si la interrumpieron. */
+  async speak(text) {
+    const my = ++this.token;
+    if (!this.ok || !cfg.voice) return true;
+    try { speechSynthesis.cancel(); } catch (e) {}
+    const parts = this.chunks(text);
+    if (!parts.length) return true;
+    this.speaking = true; setState('speaking');
+    await sleep(60);
+    for (const part of parts) {
+      if (my !== this.token) return false;
+      await new Promise(res => {
+        const u = new SpeechSynthesisUtterance(part);
+        const v = this.voice();
+        if (v) { u.voice = v; u.lang = v.lang; } else u.lang = cfg.lang;
+        u.rate = cfg.rate; u.pitch = 1; u.volume = 1;
+        let done = false;
+        const fin = () => { if (!done) { done = true; clearTimeout(guard); res(); } };
+        const guard = setTimeout(fin, 2500 + part.length * 110 / Math.max(.5, cfg.rate));
+        u.onend = fin; u.onerror = fin;
+        this._u = u;
+        try { speechSynthesis.speak(u); } catch (e) { fin(); }
+      });
+    }
+    if (my !== this.token) return false;
+    this.speaking = false;
+    if (ui.state === 'speaking') setState('idle');
+    return true;
+  },
+  stop() {
+    this.token++;
+    if (this.speaking) { this.speaking = false; if (ui.state === 'speaking') setState('idle'); }
+    if (this.ok) { try { speechSynthesis.cancel(); } catch (e) {} }
+  }
+};
+
+/* =====================================================================
+   6. VOZ: ESCUCHAR
+   ===================================================================== */
+const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+const Ear = {
+  supported: !!SRClass, rec: null, on: false, hearing: false, denied: false,
+  start() {
+    if (!this.supported || this.on || this.denied || document.hidden) return;
+    let r;
+    try { r = new SRClass(); } catch (e) { return; }
+    this.rec = r; this.on = true; this.hearing = false;
+    r.lang = cfg.lang; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;
+    let finalText = '', interim = '', error = null, silenced = false;
+    r._silence = () => { silenced = true; };
+    r.onstart = () => { if (silenced) return; setState('listening'); Sound.listen(); buzz(30); };
+    r.onresult = e => {
+      // Se reconstruye entero cada vez: evita los duplicados de iOS.
+      let f = '', i2 = '';
+      for (let i = 0; i < e.results.length; i++) { const x = e.results[i]; if (x.isFinal) f += x[0].transcript + ' '; else i2 += x[0].transcript; }
+      finalText = f; interim = i2; this.hearing = !!(f || i2);
+      els.heard.textContent = (f + i2).trim() ? 'Te escucho: ' + (f + i2).trim() : '';
+    };
+    r.onerror = e => { error = e.error; };
+    r.onend = () => {
+      if (this.rec === r) { this.rec = null; this.on = false; this.hearing = false; }
+      els.heard.textContent = '';
+      if (ui.state === 'listening') setState('idle');
+      if (silenced) return;
+      const text = (finalText || interim).trim();
+      if (text) { handleInput(text, 'voice'); return; }
+      if (error === 'not-allowed' || error === 'service-not-allowed') {
+        this.denied = true;
+        say('No tengo permiso para usar el micrófono. ' + (inFrame ? 'Abre esta página directamente en el navegador, fuera de la vista previa, y acepta el permiso.' : 'Acepta el permiso de micrófono en el navegador y vuelve a tocar el botón de hablar.') + ' Mientras tanto puedes escribirme.', { listen: false });
+        return;
+      }
+      if (error === 'audio-capture') { say('No encuentro ningún micrófono en este dispositivo. Puedes escribirme.', { listen: false }); return; }
+      if (error === 'network') { say('El reconocimiento de voz necesita conexión a internet y ahora no la tengo. Puedes escribirme.', { listen: false }); return; }
+      if (error === 'aborted') return;
+      Sound.done();
+      if (cfg.handsFree && (!error || error === 'no-speech')) setTimeout(() => { if (!TTS.speaking && ui.state === 'idle') this.start(); }, 500);
+    };
+    try { r.start(); } catch (e) { this.rec = null; this.on = false; }
+  },
+  /** Corta sin procesar lo que se estaba oyendo. */
+  stop() {
+    const r = this.rec; if (!r) return;
+    r._silence(); this.rec = null; this.on = false; this.hearing = false;
+    els.heard.textContent = '';
+    if (ui.state === 'listening') setState('idle');
+    try { r.abort(); } catch (e) {}
+  },
+  /** Termina de escuchar y procesa lo oído hasta ahora. */
+  finish() { if (this.rec) { try { this.rec.stop(); } catch (e) {} } }
+};
+
+function shouldAutoListen() {
+  if (!Ear.supported || !cfg.voice || document.hidden) return false;
+  if (cfg.handsFree) return true;
+  if (lastSource === 'text') return false;
+  if (S.pending || S.game) return true;
+  return cfg.autoListen && lastSource === 'voice';
+}
+function listenIfWanted() { if (shouldAutoListen()) setTimeout(() => { if (!TTS.speaking && ui.state === 'idle') Ear.start(); }, 250); }
+
+/** Dice un mensaje (lo escribe y lo habla). Devuelve false si lo interrumpieron. */
+async function say(text, opts = {}) {
+  text = String(text || '').trim();
+  if (!text) return true;
+  S.lastSaid = text;
+  Ear.stop();
+  if (opts.log !== false || !cfg.voice) addMsg('bot', text);
+  const finished = await TTS.speak(text);
+  if (!finished) return false;
+  const listen = opts.listen === undefined ? shouldAutoListen() : (opts.listen && Ear.supported && cfg.voice && !document.hidden);
+  if (listen) setTimeout(() => { if (!TTS.speaking && ui.state === 'idle') Ear.start(); }, 250);
+  return true;
+}
+/** Hace una pregunta y espera la siguiente respuesta de la persona (voz, texto o botón). */
+function ask(prompt) {
+  return new Promise(resolve => { S.pending = resolve; say(prompt); });
+}
+/** Si la respuesta a una pregunta era en realidad otro comando, lo ejecuta. */
+async function reroute(a) {
+  if (a.silent) return true;
+  const it = findIntent(a.t);
+  if (!it) return false;
+  S.op++;
+  await it.run(a.t, a.raw);
+  return true;
+}
+
+/* =====================================================================
+   7. CÁMARA
+   ===================================================================== */
+const CAM_NAME = { user: 'frontal', environment: 'trasera', external: 'externa' };
+const Cam = {
+  stream: null, kind: null, active: false, torchOn: false,
+  async start(kind, deviceId) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { const e = new Error('insecure'); e.name = 'InsecureError'; throw e; }
+    this.stop();
+    await sleep(120);
+    const size = { width: { ideal: 1280 }, height: { ideal: 720 } };
+    const video = deviceId ? Object.assign({ deviceId: { exact: deviceId } }, size)
+                           : Object.assign({ facingMode: { ideal: kind === 'user' ? 'user' : 'environment' } }, size);
+    const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+    const track = stream.getVideoTracks()[0];
+    const facing = track.getSettings ? track.getSettings().facingMode : undefined;
+    let actual = kind, known = kind === 'external';
+    if (kind !== 'external' && (facing === 'user' || facing === 'environment')) { actual = facing; known = true; }
+    this.stream = stream; this.kind = actual; this.active = true; this.torchOn = false;
+    track.addEventListener('ended', () => { if (this.stream === stream) { this.stop(); if (ui.state === 'idle') say('La cámara se desconectó.', { listen: false }); else note('La cámara se desconectó.'); } });
+    els.video.srcObject = stream;
+    els.video.classList.toggle('mirror', actual === 'user');
+    els.camLabel.textContent = known ? 'Cámara ' + CAM_NAME[actual] : 'Cámara activa';
+    els.camPanel.hidden = false;
+    try { await els.video.play(); } catch (e) {}
+    for (let i = 0; i < 30 && !els.video.videoWidth; i++) await sleep(100);
+    S.camPerm = true;
+    keepAwake(true);
+    countCameras();
+    return { requested: kind, actual, known };
+  },
+  stop() {
+    if (this.stream) { this.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} }); }
+    this.stream = null; this.active = false; this.kind = null; this.torchOn = false;
+    S.exploring = false; document.body.classList.remove('exploring');
+    els.video.srcObject = null; els.camPanel.hidden = true;
+    clearBoxes();
+    if (!cfg.handsFree) keepAwake(false);
+  },
+  /** Fotograma actual en un canvas, reducido para que el lado mayor no pase de maxSide. */
+  frame(maxSide = 768) {
+    const v = els.video, vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw) return null;
+    const k = Math.min(1, maxSide / Math.max(vw, vh));
+    const c = document.createElement('canvas');
+    c.width = Math.round(vw * k); c.height = Math.round(vh * k);
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    return c;
+  }
+};
+
+function camError(e) {
+  const n = e && e.name;
+  if (n === 'InsecureError') return 'La cámara solo funciona cuando la página se abre con conexión segura, es decir, con una dirección que empieza con h t t p s.';
+  if (n === 'NotAllowedError' || n === 'SecurityError') return 'No tengo permiso para usar la cámara. ' + (inFrame ? 'Abre esta página directamente en el navegador, fuera de la vista previa, y acepta el permiso de cámara.' : 'Acepta el permiso de cámara en el navegador y vuelve a decir: activar cámara.');
+  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'No encontré esa cámara en este dispositivo.';
+  if (n === 'NotReadableError' || n === 'AbortError') return 'No pude abrir la cámara. Puede que otra aplicación la esté usando. Ciérrala e inténtalo de nuevo.';
+  return 'No pude activar la cámara.';
+}
+function parseCamKind(t) {
+  if (/\b(externa|externo|usb|conectada|webcam|web|otg)\b/.test(t)) return 'external';
+  if (/\b(frontal|delantera|selfie|adelante|frente|delante)\b/.test(t)) return 'user';
+  if (/\b(trasera|atras|principal|posterior|normal)\b/.test(t)) return 'environment';
+  return null;
+}
+function classifyCam(label) {
+  const l = norm(label);
+  if (/\b(external|externa|usb|uvc)\b/.test(l)) return 'external';
+  if (/\b(front|frontal|user|selfie|delantera|facetime|truedepth)\b/.test(l)) return 'user';
+  if (/\b(back|rear|trasera|environment|posterior)\b/.test(l)) return 'environment';
+  return 'external';
+}
+async function countCameras() {
+  try { S.camCount = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput').length; } catch (e) {}
+}
+/** Lista de cámaras con nombre. Pide permiso si hace falta para poder leer los nombres. */
+async function listVideoInputs() {
+  const md = navigator.mediaDevices;
+  if (!md || !md.enumerateDevices) { const e = new Error('insecure'); e.name = 'InsecureError'; throw e; }
+  const read = async () => (await md.enumerateDevices()).filter(d => d.kind === 'videoinput');
+  let devs = await read();
+  if (!Cam.active && (!devs.length || devs.some(d => !d.label))) {
+    const tmp = await md.getUserMedia({ video: true, audio: false });
+    devs = await read();
+    tmp.getTracks().forEach(t => t.stop());
+    await sleep(250);
+  }
+  S.camPerm = true; S.camCount = devs.length;
+  const seen = { user: 0, environment: 0 };
+  return devs.map((d, i) => {
+    const kind = classifyCam(d.label);
+    let nice;
+    if (kind === 'external') nice = (d.label || '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*/i, '').trim() || 'cámara ' + (i + 1);
+    else { seen[kind]++; nice = 'cámara ' + CAM_NAME[kind] + (seen[kind] > 1 ? ' ' + seen[kind] : ''); }
+    return { deviceId: d.deviceId, kind, nice };
+  });
+}
+
+async function startCam(kind, deviceId, chain) {
+  let info;
+  try { info = await Cam.start(kind, deviceId); }
+  catch (e) { await say(camError(e)); return false; }
+  Sound.ok(); buzz(40);
+  let msg;
+  if (!info.known) msg = 'Cámara activada.';
+  else if (info.actual !== info.requested) msg = `No encontré cámara ${CAM_NAME[info.requested]}, así que activé la ${CAM_NAME[info.actual]}.`;
+  else msg = `Cámara ${CAM_NAME[info.actual]} activada.`;
+  if (chain) { await say(msg, { listen: false }); await sleep(500); return Cam.active; }
+  if (!S.tips.cam) { S.tips.cam = true; msg += ' Ahora puedes decir: qué ves, leer texto, explorar, o qué color es.'; }
+  await say(msg);
+  return true;
+}
+async function startExternal(chain) {
+  let devs;
+  try { devs = await listVideoInputs(); } catch (e) { await say(camError(e)); return false; }
+  const ext = devs.filter(d => d.kind === 'external');
+  if (!ext.length) {
+    await say('No encontré ninguna cámara externa conectada. Si tienes una, conéctala al puerto USB y di: cámara externa. Mientras tanto puedes decir: cámara frontal, o cámara trasera.');
+    return false;
+  }
+  let d = ext[0];
+  if (ext.length > 1) {
+    showCard(choiceCard('Cámaras externas', ext.map((x, i) => ({ label: cap(x.nice), say: String(i + 1), num: String(i + 1) }))));
+    const a = await ask(`Encontré ${ext.length} cámaras externas. ${ext.map((x, i) => `${NUM_LABEL[i + 1] || i + 1}: ${x.nice}`).join('. ')}. Di el número de la que quieres usar.`);
+    hideCard();
+    const n = parseNumber(a.t);
+    if (!n || n < 1 || n > ext.length) {
+      if (a.silent || await reroute(a)) return false;
+      await say('No activé ninguna cámara.'); return false;
+    }
+    d = ext[n - 1];
+  }
+  return startCam('external', d.deviceId, chain);
+}
+/** Pregunta qué cámara usar (si no viene indicada) y la enciende. Devuelve true si quedó activa. */
+async function chooseCamera(kind, chain) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { await say(camError({ name: 'InsecureError' })); return false; }
+  let tries = 0;
+  while (!kind) {
+    showCard(choiceCard('¿Qué cámara quieres usar?', [
+      { label: 'Frontal', say: 'frontal', icon: 'i-user' },
+      { label: 'Trasera', say: 'trasera', icon: 'i-cam' },
+      { label: 'Externa', say: 'externa', icon: 'i-usb' }
+    ], { cols: 3, tiles: true }));
+    const a = await ask(tries ? 'No te entendí. Di frontal, trasera o externa. O di cancelar.' : '¿Qué cámara quieres usar? Di frontal, trasera o externa.');
+    hideCard();
+    if (a.silent) return false;
+    kind = parseCamKind(a.t) || ({ 1: 'user', 2: 'environment', 3: 'external' })[parseNumber(a.t)] || null;
+    if (kind) break;
+    if (CANCEL_RE.test(a.t)) { await say('De acuerdo, no activo la cámara.'); return false; }
+    const it = findIntent(a.t);
+    if (it && it.id !== 'camOn' && it.id !== 'camSwitch') { S.op++; await it.run(a.t, a.raw); return false; }
+    if (++tries >= 2) { await say('No activé la cámara. Cuando quieras, di: activar cámara.'); return false; }
+  }
+  return kind === 'external' ? startExternal(chain) : startCam(kind, null, chain);
+}
+const ensureCamera = () => Cam.active ? Promise.resolve(true) : chooseCamera(null, true);
+
+async function cameraOff() {
+  if (!Cam.active) return say('La cámara ya está apagada.');
+  Cam.stop();
+  await say('Cámara apagada.');
+}
+async function listCameras() {
+  let devs;
+  try { devs = await listVideoInputs(); } catch (e) { return say(camError(e)); }
+  if (!devs.length) return say('No encontré ninguna cámara en este dispositivo.');
+  if (devs.length === 1) return say(`Solo encontré una cámara: ${devs[0].nice}. Di activar cámara para usarla.`);
+  showCard(choiceCard('Cámaras disponibles', devs.map((d, i) => ({ label: cap(d.nice), say: String(i + 1), num: String(i + 1) }))));
+  const a = await ask(`Encontré ${devs.length} cámaras. ${devs.map((d, i) => `${NUM_LABEL[i + 1] || i + 1}: ${d.nice}`).join('. ')}. Di el número de la que quieres usar, o cancelar.`);
+  hideCard();
+  const n = parseNumber(a.t);
+  if (!n || n < 1 || n > devs.length) {
+    if (a.silent || await reroute(a)) return;
+    return say('De acuerdo, no cambio la cámara.');
+  }
+  const d = devs[n - 1];
+  return startCam(d.kind, d.deviceId, false);
+}
+async function torch(want) {
+  if (!Cam.active || Cam.kind === 'user') {
+    if (want === false && !Cam.active) return say('La linterna ya está apagada.');
+    if (!(await startCam('environment', null, true))) return;
+  }
+  const track = Cam.stream.getVideoTracks()[0];
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  if (!caps.torch) return say('Esta cámara no tiene una linterna que yo pueda controlar.');
+  const on = want === null ? !Cam.torchOn : want;
+  try { await track.applyConstraints({ advanced: [{ torch: on }] }); Cam.torchOn = on; await say(on ? 'Linterna encendida.' : 'Linterna apagada.'); }
+  catch (e) { await say('No pude cambiar la linterna.'); }
+}
+
+let wake = null;
+async function keepAwake(on) {
+  try {
+    if (on && !wake && navigator.wakeLock) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); }
+    else if (!on && wake) { const w = wake; wake = null; await w.release(); }
+  } catch (e) {}
+}
+
+/* =====================================================================
+   8. VISIÓN EN EL DISPOSITIVO (TensorFlow.js + Tesseract.js)
+   ===================================================================== */
+const CDN = {
+  tf: 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
+  coco: 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',
+  tess: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'
+};
+const scripts = {};
+function loadScript(src) {
+  if (!scripts[src]) scripts[src] = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = true; s.crossOrigin = 'anonymous';
+    s.onload = () => res();
+    s.onerror = () => { delete scripts[src]; s.remove(); rej(new Error('No se pudo cargar ' + src)); };
+    document.head.appendChild(s);
+  });
+  return scripts[src];
+}
+const VISION_ERR = 'No pude cargar el modelo de visión. La primera vez necesita conexión a internet. Revisa tu conexión e inténtalo otra vez.';
+
+/* Las 80 clases del modelo COCO-SSD: [singular, plural, género] */
+const COCO = {
+  'person': ['persona', 'personas', 'f'], 'bicycle': ['bicicleta', 'bicicletas', 'f'], 'car': ['auto', 'autos', 'm'], 'motorcycle': ['moto', 'motos', 'f'],
+  'airplane': ['avión', 'aviones', 'm'], 'bus': ['bus', 'buses', 'm'], 'train': ['tren', 'trenes', 'm'], 'truck': ['camión', 'camiones', 'm'],
+  'boat': ['bote', 'botes', 'm'], 'traffic light': ['semáforo', 'semáforos', 'm'], 'fire hydrant': ['grifo de incendios', 'grifos de incendios', 'm'],
+  'stop sign': ['señal de pare', 'señales de pare', 'f'], 'parking meter': ['parquímetro', 'parquímetros', 'm'], 'bench': ['banca', 'bancas', 'f'],
+  'bird': ['pájaro', 'pájaros', 'm'], 'cat': ['gato', 'gatos', 'm'], 'dog': ['perro', 'perros', 'm'], 'horse': ['caballo', 'caballos', 'm'],
+  'sheep': ['oveja', 'ovejas', 'f'], 'cow': ['vaca', 'vacas', 'f'], 'elephant': ['elefante', 'elefantes', 'm'], 'bear': ['oso', 'osos', 'm'],
+  'zebra': ['cebra', 'cebras', 'f'], 'giraffe': ['jirafa', 'jirafas', 'f'], 'backpack': ['mochila', 'mochilas', 'f'], 'umbrella': ['paraguas', 'paraguas', 'm'],
+  'handbag': ['bolso', 'bolsos', 'm'], 'tie': ['corbata', 'corbatas', 'f'], 'suitcase': ['maleta', 'maletas', 'f'], 'frisbee': ['disco volador', 'discos voladores', 'm'],
+  'skis': ['par de esquís', 'pares de esquís', 'm'], 'snowboard': ['tabla de nieve', 'tablas de nieve', 'f'], 'sports ball': ['pelota', 'pelotas', 'f'],
+  'kite': ['volantín', 'volantines', 'm'], 'baseball bat': ['bate', 'bates', 'm'], 'baseball glove': ['guante de béisbol', 'guantes de béisbol', 'm'],
+  'skateboard': ['patineta', 'patinetas', 'f'], 'surfboard': ['tabla de surf', 'tablas de surf', 'f'], 'tennis racket': ['raqueta', 'raquetas', 'f'],
+  'bottle': ['botella', 'botellas', 'f'], 'wine glass': ['copa', 'copas', 'f'], 'cup': ['taza', 'tazas', 'f'], 'fork': ['tenedor', 'tenedores', 'm'],
+  'knife': ['cuchillo', 'cuchillos', 'm'], 'spoon': ['cuchara', 'cucharas', 'f'], 'bowl': ['tazón', 'tazones', 'm'], 'banana': ['plátano', 'plátanos', 'm'],
+  'apple': ['manzana', 'manzanas', 'f'], 'sandwich': ['sándwich', 'sándwiches', 'm'], 'orange': ['naranja', 'naranjas', 'f'], 'broccoli': ['brócoli', 'brócolis', 'm'],
+  'carrot': ['zanahoria', 'zanahorias', 'f'], 'hot dog': ['hot dog', 'hot dogs', 'm'], 'pizza': ['pizza', 'pizzas', 'f'], 'donut': ['dona', 'donas', 'f'],
+  'cake': ['torta', 'tortas', 'f'], 'chair': ['silla', 'sillas', 'f'], 'couch': ['sofá', 'sofás', 'm'], 'potted plant': ['planta en maceta', 'plantas en maceta', 'f'],
+  'bed': ['cama', 'camas', 'f'], 'dining table': ['mesa', 'mesas', 'f'], 'toilet': ['inodoro', 'inodoros', 'm'], 'tv': ['televisor', 'televisores', 'm'],
+  'laptop': ['computador portátil', 'computadores portátiles', 'm'], 'mouse': ['mouse', 'mouses', 'm'], 'remote': ['control remoto', 'controles remotos', 'm'],
+  'keyboard': ['teclado', 'teclados', 'm'], 'cell phone': ['celular', 'celulares', 'm'], 'microwave': ['microondas', 'microondas', 'm'], 'oven': ['horno', 'hornos', 'm'],
+  'toaster': ['tostador', 'tostadores', 'm'], 'sink': ['lavaplatos', 'lavaplatos', 'm'], 'refrigerator': ['refrigerador', 'refrigeradores', 'm'],
+  'book': ['libro', 'libros', 'm'], 'clock': ['reloj', 'relojes', 'm'], 'vase': ['florero', 'floreros', 'm'], 'scissors': ['tijera', 'tijeras', 'f'],
+  'teddy bear': ['oso de peluche', 'osos de peluche', 'm'], 'hair drier': ['secador de pelo', 'secadores de pelo', 'm'], 'toothbrush': ['cepillo de dientes', 'cepillos de dientes', 'm']
+};
+const esName = cls => COCO[cls] || [cls, cls, 'm'];
+const withUn = cls => { const [sg, , g] = esName(cls); return (g === 'f' ? 'una ' : 'un ') + sg; };
+const withEl = cls => { const [sg, , g] = esName(cls); return (g === 'f' ? 'la ' : 'el ') + sg; };
+const POS = ['a la izquierda', 'al centro', 'a la derecha'];
+
+const Vision = {
+  model: null, loading: null,
+  load() {
+    if (this.model) return Promise.resolve(this.model);
+    if (!this.loading) this.loading = (async () => {
+      await loadScript(CDN.tf);
+      await loadScript(CDN.coco);
+      this.model = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' });
+      return this.model;
+    })().catch(e => { this.loading = null; throw e; });
+    return this.loading;
+  },
+  async detect(minScore = .5) {
+    const m = await this.load();
+    if (!els.video.videoWidth) return [];
+    return m.detect(els.video, 15, minScore);
+  }
+};
+/** Agrupa las detecciones por objeto y posición (izquierda, centro, derecha). */
+function summarize(preds) {
+  const vw = els.video.videoWidth || 1, vh = els.video.videoHeight || 1, groups = new Map();
+  for (const p of preds) {
+    const [x, y, w, h] = p.bbox;
+    let cx = (x + w / 2) / vw;
+    if (Cam.kind === 'user') cx = 1 - cx;
+    const pos = cx < .36 ? 0 : cx > .64 ? 2 : 1;
+    const key = p.class + '|' + pos;
+    const g = groups.get(key) || { cls: p.class, pos, n: 0, near: false };
+    g.n++; g.near = g.near || (w * h) / (vw * vh) > .45;
+    groups.set(key, g);
+  }
+  const rank = g => (g.cls === 'person' ? 0 : 10) + (g.near ? 0 : 3) + (g.pos === 1 ? 0 : 1);
+  return [...groups.values()].sort((a, b) => rank(a) - rank(b));
+}
+function groupPhrase(g) {
+  const [sg, pl, gen] = esName(g.cls);
+  const what = g.n === 1 ? (gen === 'f' ? 'una ' : 'un ') + sg : `${g.n} ${pl}`;
+  return `${what} ${POS[g.pos]}${g.near ? ', muy cerca' : ''}`;
+}
+function groupsKey(groups) { return groups.map(g => g.cls + g.pos + (g.near ? '!' : '') + g.n).sort().join(','); }
+
+function drawBoxes(preds) {
+  const c = els.overlay, v = els.video;
+  if (!v.videoWidth) return;
+  if (c.width !== v.videoWidth || c.height !== v.videoHeight) { c.width = v.videoWidth; c.height = v.videoHeight; }
+  const g = c.getContext('2d'), s = Math.max(2, c.width / 220);
+  g.clearRect(0, 0, c.width, c.height);
+  g.lineWidth = s * 1.5; g.font = `700 ${Math.round(s * 9)}px system-ui, sans-serif`; g.textBaseline = 'top';
+  for (const p of preds) {
+    let [x, y, w, h] = p.bbox;
+    if (Cam.kind === 'user') x = c.width - x - w;
+    g.strokeStyle = '#FFC233'; g.strokeRect(x, y, w, h);
+    const label = esName(p.class)[0], lh = s * 12, ly = Math.max(0, y - lh);
+    g.fillStyle = '#FFC233'; g.fillRect(x, ly, g.measureText(label).width + s * 6, lh);
+    g.fillStyle = '#191100'; g.fillText(label, x + s * 3, ly + s * 1.5);
+  }
+}
+function clearBoxes() { const c = els.overlay; c.getContext('2d').clearRect(0, 0, c.width, c.height); }
+
+const probe = document.createElement('canvas'); probe.width = 48; probe.height = 36;
+const pctx = probe.getContext('2d', { willReadFrequently: true });
+function luminance() {
+  const v = els.video;
+  if (!v.videoWidth) return { avg: 128, left: 128, right: 128 };
+  pctx.drawImage(v, 0, 0, 48, 36);
+  const d = pctx.getImageData(0, 0, 48, 36).data;
+  let l = 0, r = 0;
+  for (let y = 0; y < 36; y++) for (let x = 0; x < 48; x++) {
+    const i = (y * 48 + x) * 4, Y = .2126 * d[i] + .7152 * d[i + 1] + .0722 * d[i + 2];
+    if (x < 24) l += Y; else r += Y;
+  }
+  let left = l / 864, right = r / 864;
+  if (Cam.kind === 'user') [left, right] = [right, left];
+  return { avg: (left + right) / 2, left, right };
+}
+function centerColor() {
+  const v = els.video, vw = v.videoWidth, vh = v.videoHeight, side = Math.min(vw, vh) * .18;
+  pctx.drawImage(v, (vw - side) / 2, (vh - side) / 2, side, side, 0, 0, 16, 16);
+  const d = pctx.getImageData(0, 0, 16, 16).data;
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+  const n = d.length / 4;
+  return [r / n, g / n, b / n];
+}
+function colorName(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  let h = 0, s = 0;
+  if (d) {
+    s = l > .5 ? d / (2 - max - min) : d / (max + min);
+    h = 60 * (max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4);
+  }
+  if (l < .1) return 'negro';
+  if (s < .12 || d < .06) return l > .85 ? 'blanco' : l > .62 ? 'gris claro' : l > .3 ? 'gris' : 'gris oscuro';
+  if (l > .93) return 'blanco';
+  let name, fixed = false;
+  if (h < 14 || h >= 345) { if (l > .7) { name = 'rosado'; fixed = true; } else name = 'rojo'; }
+  else if (h < 42) { if (l < .38 || (s < .45 && l < .55)) { name = 'café'; fixed = true; } else if (l > .8) { name = 'color crema'; fixed = true; } else name = 'naranja'; }
+  else if (h < 68) { if (l < .3) { name = 'verde oliva'; fixed = true; } else if (s < .35 || (l > .82 && d < .25)) { name = 'beige'; fixed = true; } else name = 'amarillo'; }
+  else if (h < 165) name = 'verde';
+  else if (h < 195) name = 'turquesa';
+  else if (h < 255) { if (l > .68 && h < 222) { name = 'celeste'; fixed = true; } else name = 'azul'; }
+  else if (h < 290) name = 'morado';
+  else if (l < .4) name = 'morado';
+  else if (l > .7) { name = 'rosado'; fixed = true; }
+  else { name = 'fucsia'; fixed = true; }
+  return fixed ? name : name + (l < .28 ? ' oscuro' : l > .72 ? ' claro' : '');
+}
+
+const OCR = {
+  worker: null, loading: null,
+  get() {
+    if (this.worker) return Promise.resolve(this.worker);
+    if (!this.loading) this.loading = (async () => {
+      await loadScript(CDN.tess);
+      this.worker = await window.Tesseract.createWorker('spa');
+      return this.worker;
+    })().catch(e => { this.loading = null; throw e; });
+    return this.loading;
+  },
+  async read(canvas) {
+    const w = await this.get();
+    const { data } = await w.recognize(canvas);
+    let lines;
+    if (Array.isArray(data.lines) && data.lines.length) lines = data.lines.filter(l => l.confidence >= 55).map(l => l.text);
+    else lines = (data.confidence || 0) >= 45 ? String(data.text || '').split('\n') : [];
+    lines = lines.map(s => s.replace(/\s+/g, ' ').trim()).filter(s => {
+      const good = (s.match(/[a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ]/g) || []).length;
+      return good >= 2 && good / s.length > .55;
+    });
+    return lines.join('\n');
+  }
+};
+
+/* =====================================================================
+   9. INTELIGENCIA ARTIFICIAL EN LÍNEA
+   ===================================================================== */
+const SYSTEM = 'Eres Faro, un asistente de voz en español para personas ciegas o con baja visión. Tus respuestas se leen en voz alta: usa solo texto plano, sin markdown, sin emojis y sin listas con símbolos. Sé breve, claro y cálido: como máximo tres o cuatro oraciones, salvo que te pidan más detalle. Trata a la persona de tú. Si no sabes algo o no estás seguro, dilo con honestidad en vez de inventar. La aplicación tiene comandos de voz propios: activar cámara, qué ves, leer texto, explorar, qué color es, linterna, qué hora es, dónde estoy y jugar; si te piden algo de eso, sugiere decir el comando.';
+const VISION_SYS = SYSTEM + ' Cuando recibas una imagen, eres los ojos de la persona: describe primero lo más importante y lo que esté más cerca, menciona obstáculos o peligros, usa posiciones como izquierda, derecha, al centro, cerca o lejos, y lee el texto visible si lo hay. No digas "en la imagen" ni "en la foto". No identifiques a personas por su nombre.';
+const VISUAL_RE = /\b(ves|ve|mira|miras|esto|este|esta|aqui|aca|color|delante|frente|foto|imagen|camara|mano|manos|cuantos|cuantas|que es|que dice|puesto|puesta|como (es|se ve|me veo|estoy))\b/;
+const FREE_AI = [
+  { name: 'LLM7', url: 'https://api.llm7.io/v1/chat/completions', model: 'mistral-Nemo-Instruct-2407' },
+  { name: 'LLM7', url: 'https://api.llm7.io/v1/chat/completions', model: 'gpt-oss:20b' },
+  { name: 'Pollinations', url: 'https://text.pollinations.ai/openai', model: 'openai-fast', every: 46 }   // sin clave: una respuesta cada 45 segundos
+];
+const AI = { history: [], canSee: () => !!cfg.geminiKey && cfg.ai !== 'local' };
+
+async function fetchT(url, options, ms) {
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, Object.assign({ signal: ctrl.signal }, options)); }
+  finally { clearTimeout(timer); }
+}
+/* Los servicios sin clave limitan el uso por minuto y por hora. Cuando uno avisa que
+   hay que esperar, se anota hasta cuándo y mientras tanto se usa el siguiente. */
+const cool = {};
+function aiWait() {
+  const waits = Object.values(cool).map(t => t - Date.now()).filter(ms => ms > 0);
+  return waits.length ? Math.ceil(Math.min(...waits) / 1000) : 0;
+}
+async function openaiStyle(p, messages) {
+  const host = new URL(p.url).host;
+  if (cool[host] > Date.now()) throw new Error(p.name + ' en pausa');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await fetchT(p.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: p.model, messages, temperature: .7 }) }, 22000);
+    if (r.status === 429 || r.status === 402) {
+      let ra = 0;
+      try { const e = (await r.json()).error || {}; ra = +e.retry_after || +((String(e.message || '').match(/after (\d+)\s*s/i) || [])[1]) || 0; } catch (e) {}
+      if (!ra) ra = 20;
+      if (ra <= 3 && attempt === 0) { await sleep(ra * 1000 + 300); continue; }
+      cool[host] = Date.now() + ra * 1000;
+      throw new Error(`${p.name} pide esperar ${ra} s`);
+    }
+    if (!r.ok) throw new Error(p.name + ' HTTP ' + r.status);
+    const j = await r.json();
+    const c = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    if (typeof c !== 'string' || !c.trim()) throw new Error(p.name + ' sin contenido');
+    if (p.every) cool[host] = Date.now() + p.every * 1000;
+    return c;
+  }
+  throw new Error(p.name + ' ocupado');
+}
+async function gemini(messages, imageB64) {
+  const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+  const contents = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+  if (imageB64) contents[contents.length - 1].parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageB64 } });
+  const model = encodeURIComponent((cfg.geminiModel || 'gemini-flash-latest').trim());
+  const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.geminiKey.trim() },
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents, generationConfig: { temperature: .6 } })
+  }, 30000);
+  if (!r.ok) { const e = new Error('Gemini HTTP ' + r.status); e.status = r.status; throw e; }
+  const j = await r.json();
+  const parts = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+  const text = (parts || []).map(p => p.text || '').join('').trim();
+  if (!text) throw new Error('Gemini sin contenido');
+  return text;
+}
+function geminiTrouble(e) {
+  console.warn(e.message);
+  if (S.tips.key) return;
+  S.tips.key = true;
+  note(e.status === 400 || e.status === 401 || e.status === 403 ? 'La clave de Gemini no fue aceptada. Revísala en Ajustes.' : 'Gemini no respondió; uso las alternativas gratuitas.');
+}
+/** Respuesta de texto de la IA en línea, o null si no hay ninguna disponible. */
+async function aiText(messages) {
+  if (cfg.ai === 'local' || navigator.onLine === false) return null;
+  if (cfg.geminiKey) { try { return await gemini(messages); } catch (e) { geminiTrouble(e); } }
+  for (let round = 0; round < 2; round++) {
+    for (const p of FREE_AI) { try { return await openaiStyle(p, messages); } catch (e) { console.warn(e.message); } }
+    const w = aiWait();
+    if (round === 0 && w > 0 && w <= 8) await sleep(w * 1000 + 300); else break;   // espera corta: vale la pena reintentar
+  }
+  return null;
+}
+function aiBusyText() {
+  const w = aiWait();
+  if (cfg.ai === 'local') return 'Estoy en modo solo dispositivo, así que no puedo conversar sobre cualquier tema.';
+  if (navigator.onLine === false) return 'Ahora no hay conexión a internet, así que no puedo conversar con la inteligencia artificial.';
+  if (w) return `La inteligencia artificial gratuita tiene un límite de uso y ahora está en pausa. Podrá responder en unos ${w < 90 ? w + ' segundos' : Math.ceil(w / 60) + ' minutos'}.`;
+  return 'En este momento no pude conectarme con la inteligencia artificial.';
+}
+/** Respuesta de la IA mirando la cámara. Solo con clave de Gemini. */
+async function aiVision(prompt, system) {
+  const c = Cam.frame(768);
+  if (!c) throw new Error('sin imagen');
+  return gemini([{ role: 'system', content: system || VISION_SYS }, { role: 'user', content: prompt }], c.toDataURL('image/jpeg', .75).split(',')[1]);
+}
+
+const JOKES = [
+  '¿Qué le dice un semáforo a otro? No me mires, que me estoy cambiando.',
+  '¿Qué hace una abeja en el gimnasio? Zumba.',
+  '¿Por qué los pájaros vuelan al norte en invierno? Porque caminando tardarían demasiado.',
+  '¿Cuál es el café más peligroso del mundo? El ex preso.',
+  '¿Qué le dijo el cero al ocho? Qué bonito cinturón.',
+  '¿Cómo se despiden los químicos? Ácido un placer.',
+  '¿Cuál es el colmo de un electricista? Que sus hijos no le sigan la corriente.',
+  '¿Qué le dice una impresora a otra? ¿Esa hoja es tuya o es impresión mía?'
+];
+function mathLocal(t) {
+  const m = t.match(/^(?:cuanto (?:es|da|son|seria)|calcula|calcular)?\s*(.+?)\s+(mas|menos|por|multiplicado por|dividido por|dividido entre|dividido|entre|x)\s+(.+)$/);
+  if (!m) return null;
+  const a = parseNumber(m[1]), b = parseNumber(m[3]);
+  if (a === null || b === null) return null;
+  const op = m[2];
+  let r, word;
+  if (op === 'mas') { r = a + b; word = 'más'; }
+  else if (op === 'menos') { r = a - b; word = 'menos'; }
+  else if (op === 'por' || op === 'x' || op === 'multiplicado por') { r = a * b; word = 'por'; }
+  else { if (b === 0) return 'No se puede dividir por cero.'; r = a / b; word = 'dividido por'; }
+  const shown = Number.isInteger(r) ? String(r) : r.toFixed(2).replace('.', ',');
+  return `${a} ${word} ${b} es ${r < 0 ? 'menos ' + shown.replace('-', '') : shown}.`;
+}
+function localReply(raw) {
+  const t = norm(raw);
+  if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|ola)\b/.test(t)) return '¡Hola! Qué gusto escucharte. ¿En qué te ayudo?';
+  if (/\bcomo estas\b|\bque tal\b|\bcomo te va\b/.test(t)) return 'Estoy muy bien, gracias por preguntar. ¿Y tú, cómo estás?';
+  if (/\bquien eres\b|\bcomo te llamas\b|\bque eres\b|\btu nombre\b/.test(t)) return 'Soy Faro, un asistente de voz para personas ciegas o con baja visión. Puedo usar la cámara para decirte lo que hay delante, leer textos, conversar y jugar contigo.';
+  if (/\bgracias\b/.test(t)) return 'De nada. Para eso estoy.';
+  if (/^(chao|adios|hasta luego|nos vemos|bye)\b/.test(t)) return '¡Hasta luego! Aquí estaré cuando me necesites.';
+  const m = mathLocal(t);
+  if (m) return m;
+  return aiBusyText() + ' Mientras tanto puedo usar la cámara, decirte la hora, contarte un chiste o jugar contigo.';
+}
+
+async function chat(raw) {
+  const my = S.op, alive = () => my === S.op;
+  let reply = null;
+  if (cfg.ai !== 'local') {
+    startThinking();
+    const now = new Date();
+    const sys = `${SYSTEM} Fecha y hora local de la persona: ${now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ${now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}.`;
+    try {
+      if (Cam.active && AI.canSee() && VISUAL_RE.test(norm(raw))) {
+        try { reply = await aiVision(raw); } catch (e) { geminiTrouble(e); }
+      }
+      if (!reply) reply = await aiText([{ role: 'system', content: sys }, ...AI.history, { role: 'user', content: raw }]);
+    } catch (e) { console.warn(e); }
+    stopThinking();
+    if (!alive()) return;
+  }
+  if (reply) {
+    reply = plain(reply);
+    AI.history.push({ role: 'user', content: raw }, { role: 'assistant', content: reply });
+    if (AI.history.length > 12) AI.history.splice(0, AI.history.length - 12);
+    await say(reply);
+  } else await say(localReply(raw));
+}
+
+/* =====================================================================
+   10. FUNCIONES QUE SE PIDEN CON LA VOZ
+   ===================================================================== */
+async function describeScene(raw) {
+  if (!(await ensureCamera())) return;
+  const my = S.op, alive = () => my === S.op;
+  if (AI.canSee()) {
+    startThinking();
+    try {
+      const r = await aiVision('Describe lo que hay frente a la cámara. ' + (raw && !/^(que ves|mira|describe)\W*$/i.test(norm(raw)) ? 'La persona preguntó: ' + raw : ''));
+      stopThinking(); if (!alive()) return;
+      return say(plain(r));
+    } catch (e) { stopThinking(); if (!alive()) return; geminiTrouble(e); }
+  }
+  if (!Vision.model) { await say('Estoy preparando la visión. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
+  startThinking();
+  let preds;
+  try { preds = await Vision.detect(.5); } catch (e) { stopThinking(); if (alive()) await say(VISION_ERR); return; }
+  stopThinking(); if (!alive()) return;
+  drawBoxes(preds);
+  if (!S.exploring) setTimeout(() => { if (!S.exploring && !(S.game && S.game.usesBoxes)) clearBoxes(); }, 5000);
+  const groups = summarize(preds);
+  let text = groups.length ? 'Veo ' + listJoin(groups.map(groupPhrase)) + '.'
+    : 'No reconozco ningún objeto conocido frente a la cámara. Prueba mover el teléfono lentamente o alejarlo un poco.';
+  if (luminance().avg < 40) text += ' Hay muy poca luz. Puedes decir: enciende la linterna.';
+  if (!S.tips.vision && !cfg.geminiKey) { S.tips.vision = true; text += ' Te aviso que así solo reconozco objetos comunes, y puedo equivocarme.'; }
+  await say(text);
+}
+
+async function readText() {
+  if (!(await ensureCamera())) return;
+  const my = S.op, alive = () => my === S.op;
+  const NO_TEXT = 'No encontré texto que pueda leer. Acerca la cámara a unos 20 centímetros del texto, con buena luz, mantén el teléfono quieto y vuelve a decir: leer texto.';
+  if (AI.canSee()) {
+    startThinking();
+    try {
+      const r = plain(await aiVision('Lee el texto visible. Transcríbelo tal cual, en el orden natural de lectura, sin agregar comentarios ni explicaciones. Si no hay texto legible, responde únicamente: SIN TEXTO.', SYSTEM));
+      stopThinking(); if (!alive()) return;
+      return say(/^sin texto/i.test(r) ? NO_TEXT : 'El texto dice: ' + r);
+    } catch (e) { stopThinking(); if (!alive()) return; geminiTrouble(e); }
+  }
+  await say(OCR.worker ? 'Leyendo. Mantén el teléfono quieto.' : 'Voy a leer. La primera vez tardo más, porque preparo el lector de texto. Mantén el teléfono quieto.', { listen: false });
+  if (!alive() || !Cam.active) return;
+  const canvas = Cam.frame(1600);
+  startThinking();
+  let text;
+  try { text = await OCR.read(canvas); }
+  catch (e) { stopThinking(); if (alive()) await say('No pude cargar el lector de texto. La primera vez necesita conexión a internet. Inténtalo otra vez.'); return; }
+  stopThinking(); if (!alive()) return;
+  await say(text ? 'El texto dice: ' + text : NO_TEXT);
+}
+
+async function tellColor() {
+  if (!(await ensureCamera())) return;
+  await sleep(150);
+  const [r, g, b] = centerColor();
+  let text = `El color en el centro de la imagen es ${colorName(r, g, b)}.`;
+  if (luminance().avg < 40) text += ' Hay poca luz, así que puede no ser exacto.';
+  await say(text);
+}
+async function tellLight() {
+  if (!(await ensureCamera())) return;
+  await sleep(150);
+  const { avg, left, right } = luminance();
+  let text = avg < 30 ? 'Está muy oscuro.' : avg < 80 ? 'Hay poca luz.' : avg < 165 ? 'Hay buena luz.' : 'Hay mucha luz.';
+  if (avg >= 30 && Math.max(left, right) > Math.min(left, right) * 1.45 + 8) text += ` La luz viene más desde la ${left > right ? 'izquierda' : 'derecha'}.`;
+  await say(text);
+}
+
+async function exploreStart() {
+  if (!(await ensureCamera())) return;
+  const my = S.op, alive = () => my === S.op;
+  if (S.exploring) return say('Ya estoy explorando. Para terminar, di detener.', { listen: cfg.handsFree });
+  if (!Vision.model) { await say('Estoy preparando la visión. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
+  startThinking();
+  try { await Vision.load(); } catch (e) { stopThinking(); if (alive()) await say(VISION_ERR); return; }
+  stopThinking(); if (!alive() || !Cam.active) return;
+  S.exploring = true; document.body.classList.add('exploring');
+  await say('Modo exploración activado. Te iré diciendo los objetos que reconozco y dónde están. Para terminar, toca el botón de hablar y di detener. Recuerda que solo reconozco algunos objetos: no reemplazo a tu bastón ni a tu perro guía.', { listen: cfg.handsFree });
+  exploreLoop();
+}
+async function exploreLoop() {
+  let lastKey = '', lastTime = 0, candidate = null, seen = 0;
+  while (S.exploring && Cam.active) {
+    await sleep(650);
+    if (!S.exploring || !Cam.active) break;
+    if (TTS.speaking || Ear.hearing || ui.state === 'thinking' || S.pending || document.hidden) continue;
+    let preds;
+    try { preds = await Vision.detect(.55); } catch (e) { continue; }
+    if (!S.exploring) break;
+    drawBoxes(preds);
+    const groups = summarize(preds), key = groupsKey(groups);
+    if (key === candidate) seen++; else { candidate = key; seen = 1; }
+    if (seen < 2) continue;
+    if (!key) { lastKey = ''; continue; }
+    if (key !== lastKey && Date.now() - lastTime > 3000 && !TTS.speaking && !Ear.hearing) {
+      lastKey = key; lastTime = Date.now();
+      if (groups.some(g => g.near && g.cls === 'person')) buzz([80, 60, 80]);
+      await say(groups.map(g => cap(groupPhrase(g))).join('. ') + '.', { listen: cfg.handsFree });
+    }
+  }
+  S.exploring = false; document.body.classList.remove('exploring');
+  clearBoxes();
+}
+async function exploreStop() {
+  if (!S.exploring) return say('No estoy explorando ahora.');
+  S.exploring = false;
+  await say('Exploración detenida.');
+}
+
+function timePhrase(d) {
+  const h = d.getHours(), m = d.getMinutes(), h12 = h % 12 || 12;
+  const per = h < 6 ? 'de la madrugada' : h < 12 ? 'de la mañana' : h < 20 ? 'de la tarde' : 'de la noche';
+  const mm = m === 0 ? 'en punto' : m === 15 ? 'y cuarto' : m === 30 ? 'y media' : 'y ' + m;
+  return `${h12 === 1 ? 'Es la' : 'Son las'} ${h12} ${mm} ${per}.`;
+}
+const tellTime = () => say(timePhrase(new Date()));
+const tellDate = () => say('Hoy es ' + new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '.');
+async function tellBattery() {
+  if (!navigator.getBattery) return say('Este navegador no me deja consultar la batería.');
+  try {
+    const b = await navigator.getBattery();
+    await say(`La batería está al ${Math.round(b.level * 100)} por ciento${b.charging ? ' y se está cargando' : ''}.`);
+  } catch (e) { await say('No pude consultar la batería.'); }
+}
+async function tellLocation() {
+  if (!navigator.geolocation) return say('Este dispositivo no me permite conocer la ubicación.');
+  const my = S.op, alive = () => my === S.op;
+  startThinking();
+  let pos;
+  try { pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 })); }
+  catch (e) {
+    stopThinking(); if (!alive()) return;
+    return say(e && e.code === 1 ? 'No tengo permiso para ver tu ubicación. Acepta el permiso de ubicación en el navegador e inténtalo otra vez.' : 'No pude obtener tu ubicación. Inténtalo de nuevo, de preferencia en un lugar abierto.');
+  }
+  const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+  let text = '';
+  try {
+    const r = await fetchT(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&accept-language=es&lat=${lat}&lon=${lon}`, {}, 10000);
+    const a = (await r.json()).address || {};
+    const street = a.road || a.pedestrian || a.footway || a.path;
+    const parts = [street ? street + (a.house_number ? ' ' + a.house_number : '') : null, a.neighbourhood || a.suburb || a.quarter, a.city || a.town || a.village || a.municipality].filter(Boolean);
+    if (parts.length) text = 'Estás cerca de ' + parts.join(', ') + '.';
+  } catch (e) {}
+  stopThinking(); if (!alive()) return;
+  if (!text) text = `No pude obtener el nombre de la calle. Tus coordenadas son: latitud ${lat.toFixed(4)}, longitud ${lon.toFixed(4)}.`;
+  await say(accuracy >= 1 ? `${text} La precisión es de unos ${Math.round(accuracy)} metros.` : text);
+}
+
+async function setRateByVoice(t) {
+  if (/normal/.test(t)) cfg.rate = 1;
+  else if (/rapido/.test(t)) cfg.rate = Math.min(1.8, +(cfg.rate + .2).toFixed(1));
+  else cfg.rate = Math.max(.6, +(cfg.rate - .2).toFixed(1));
+  saveCfg(); syncSettings();
+  await say(/normal/.test(t) ? 'Vuelvo a mi velocidad normal.' : /rapido/.test(t) ? 'De acuerdo, hablo más rápido.' : 'De acuerdo, hablo más lento.');
+}
+async function toggleHandsFree(t) {
+  const off = /\b(desactiv\w*|apag\w*|quit\w*|sin|no|deten\w*|termin\w*)\b/.test(t);
+  cfg.handsFree = !off; saveCfg(); syncSettings(); applyCfg();
+  if (off) return say('Manos libres desactivado. Toca el botón de abajo cuando quieras hablar.', { listen: false });
+  if (!Ear.supported) return say('Este navegador no puede escucharte, así que el modo manos libres no está disponible.');
+  await say('Manos libres activado. Te escucho todo el tiempo, sin que toques la pantalla. Para apagarlo, di: desactivar manos libres.');
+}
+async function clearChat() { els.log.replaceChildren(); AI.history.length = 0; await say('Conversación borrada.'); }
+async function sos() {
+  const num = String(cfg.sos || '').replace(/[^\d+]/g, '');
+  if (!num) return say('No hay un teléfono de emergencia guardado. Pídele a alguien de confianza que lo agregue en Ajustes. En Chile, el 131 es ambulancia, el 132 bomberos y el 133 carabineros.');
+  await say('Abro el marcador con tu contacto de emergencia. Confirma la llamada en la pantalla.', { listen: false });
+  try { window.location.href = 'tel:' + num; } catch (e) {}
+}
+const HELP = 'Esto es lo que puedes pedirme. Para ver: activar cámara, qué ves, leer texto, explorar, qué color es, hay luz, y linterna. Para informarte: qué hora es, qué día es, batería, y dónde estoy. Para pasarlo bien: jugar, o cuéntame un chiste. También puedes conversar conmigo sobre cualquier tema. En cualquier momento di repite para escucharme otra vez, o silencio para que me calle.';
+
+/* =====================================================================
+   11. JUEGOS
+   ===================================================================== */
+const TRIVIA = [
+  { q: '¿Cuál es el planeta más grande del sistema solar?', o: ['Marte', 'Júpiter', 'Saturno'], c: 1 },
+  { q: '¿Cuántos lados tiene un hexágono?', o: ['5', '6', '8'], c: 1 },
+  { q: '¿Cuál es la capital de Chile?', o: ['Valparaíso', 'Santiago', 'Concepción'], c: 1 },
+  { q: '¿Cuál es el animal más grande del mundo?', o: ['el elefante africano', 'la ballena azul', 'la jirafa'], c: 1 },
+  { q: '¿Cuál es el río más caudaloso de Sudamérica?', o: ['el Amazonas', 'el Paraná', 'el Orinoco'], c: 0 },
+  { q: '¿Quién escribió la novela Cien años de soledad?', o: ['Gabriel García Márquez', 'Mario Vargas Llosa', 'Isabel Allende'], c: 0 },
+  { q: '¿Qué poeta chileno ganó el Premio Nobel de Literatura en 1971?', o: ['Gabriela Mistral', 'Pablo Neruda', 'Nicanor Parra'], c: 1 },
+  { q: '¿Cuántos días tiene un año bisiesto?', o: ['364', '365', '366'], c: 2 },
+  { q: '¿Cuál es el océano más grande del mundo?', o: ['el Atlántico', 'el Índico', 'el Pacífico'], c: 2 },
+  { q: '¿Cuántas cuerdas tiene una guitarra clásica?', o: ['4', '6', '8'], c: 1 },
+  { q: '¿En qué continente está Egipto?', o: ['Asia', 'África', 'Europa'], c: 1 },
+  { q: '¿Qué metal es líquido a temperatura ambiente?', o: ['el mercurio', 'el plomo', 'el aluminio'], c: 0 },
+  { q: '¿Cuántos huesos tiene el cuerpo de una persona adulta?', o: ['106', '206', '306'], c: 1 },
+  { q: '¿Cuál es el país más grande del mundo?', o: ['Canadá', 'China', 'Rusia'], c: 2 },
+  { q: '¿Quién inventó el sistema de lectura táctil que usan las personas ciegas?', o: ['Louis Braille', 'Alexander Graham Bell', 'Thomas Edison'], c: 0 },
+  { q: '¿Cuántos puntos tiene una celda de braille?', o: ['4', '6', '9'], c: 1 },
+  { q: '¿Cuál es el desierto más árido del mundo?', o: ['el Sahara', 'el desierto de Atacama', 'el Gobi'], c: 1 },
+  { q: '¿Qué idioma se habla en Brasil?', o: ['español', 'portugués', 'francés'], c: 1 },
+  { q: '¿Cuántos jugadores tiene en cancha un equipo de fútbol?', o: ['9', '10', '11'], c: 2 },
+  { q: '¿Cuál es el animal terrestre más rápido?', o: ['el guepardo', 'el león', 'el caballo'], c: 0 },
+  { q: '¿Cuál es la montaña más alta de América?', o: ['el Aconcagua', 'el Ojos del Salado', 'el Chimborazo'], c: 0 },
+  { q: '¿Cuántos colores se cuentan tradicionalmente en el arcoíris?', o: ['5', '7', '9'], c: 1 },
+  { q: '¿En qué año llegó el ser humano a la Luna por primera vez?', o: ['1959', '1969', '1979'], c: 1 },
+  { q: '¿Qué compositor siguió creando música después de quedar sordo?', o: ['Mozart', 'Beethoven', 'Bach'], c: 1 },
+  { q: '¿Cuál es el hueso más largo del cuerpo humano?', o: ['el fémur', 'el húmero', 'la tibia'], c: 0 },
+  { q: '¿De qué país es típico el tango?', o: ['Argentina', 'México', 'España'], c: 0 },
+  { q: '¿Cuántas patas tiene una araña?', o: ['6', '8', '10'], c: 1 },
+  { q: '¿Qué isla chilena es famosa por sus moáis?', o: ['Chiloé', 'Rapa Nui', 'Robinson Crusoe'], c: 1 },
+  { q: '¿Qué sentido usan los murciélagos para orientarse en la oscuridad?', o: ['el oído', 'el olfato', 'la vista'], c: 0 },
+  { q: '¿Cuál es el planeta más cercano al Sol?', o: ['Venus', 'Mercurio', 'Marte'], c: 1 },
+  { q: '¿Qué número representa la letra X en los números romanos?', o: ['5', '10', '50'], c: 1 },
+  { q: '¿Qué artista chilena compuso la canción Gracias a la vida?', o: ['Violeta Parra', 'Mon Laferte', 'Myriam Hernández'], c: 0 },
+  { q: '¿Cuál es el baile nacional de Chile?', o: ['la cueca', 'el tango', 'la cumbia'], c: 0 },
+  { q: '¿A qué planeta le dicen el planeta rojo?', o: ['Marte', 'Venus', 'Júpiter'], c: 0 },
+  { q: '¿Qué vitamina produce nuestra piel con la luz del sol?', o: ['la vitamina A', 'la vitamina C', 'la vitamina D'], c: 2 },
+  { q: '¿Qué órgano bombea la sangre por el cuerpo?', o: ['el pulmón', 'el corazón', 'el hígado'], c: 1 },
+  { q: '¿Qué instrumento tiene teclas blancas y negras?', o: ['el piano', 'la guitarra', 'el violín'], c: 0 },
+  { q: '¿Cuál es el idioma con más hablantes nativos del mundo?', o: ['el inglés', 'el chino mandarín', 'el español'], c: 1 }
+];
+const RIDDLES = [
+  { q: 'Oro parece, plata no es. ¿Qué fruta es?', a: ['platano', 'banana', 'banano'], s: 'el plátano', h: 'Es una fruta amarilla y alargada. Su nombre está escondido en la adivinanza.' },
+  { q: 'Blanca por dentro, verde por fuera. Si quieres que te lo diga, espera.', a: ['pera'], s: 'la pera', h: 'Es una fruta, y su nombre se esconde en la última palabra.' },
+  { q: 'Tengo agujas y no sé coser, tengo números y no sé leer. ¿Qué soy?', a: ['reloj'], s: 'el reloj', h: 'Me consultas para saber la hora.' },
+  { q: 'Vuelo de noche, duermo de día, y nunca verás plumas en ala mía. ¿Qué soy?', a: ['murcielago'], s: 'el murciélago', h: 'Soy un mamífero que se orienta con el oído.' },
+  { q: 'Cuanto más le quitas, más grande se hace. ¿Qué es?', a: ['hoyo', 'agujero', 'hueco', 'pozo', 'hoyito'], s: 'el hoyo', h: 'Se hace cavando en la tierra.' },
+  { q: 'Tiene dientes y no come, tiene cabeza y no es persona. ¿Qué es?', a: ['ajo'], s: 'el ajo', h: 'Se usa en la cocina y tiene un olor muy fuerte.' },
+  { q: 'Todos pasan por mí, pero yo no paso por nadie. Todos preguntan por mí, pero yo no pregunto por nadie. ¿Qué soy?', a: ['calle', 'camino', 'avenida'], s: 'la calle', h: 'Por mí caminan las personas y pasan los autos.' },
+  { q: 'Te la digo y no me entiendes, te la repito y no me comprendes. ¿Qué es?', a: ['tela'], s: 'la tela', h: 'Escucha bien las dos primeras palabras. Con ella se hace la ropa.' },
+  { q: 'Soy redonda como un queso y nadie puede darme un beso. ¿Qué soy?', a: ['luna'], s: 'la luna', h: 'Aparezco en el cielo de noche.' },
+  { q: 'Una señora muy aseñorada, siempre va en coche y siempre va mojada. ¿Qué es?', a: ['lengua'], s: 'la lengua', h: 'Está dentro de tu boca.' },
+  { q: 'Tengo hojas y no soy árbol, te hablo sin tener voz. Si me abres no me quejo. Adivina quién soy yo.', a: ['libro', 'cuaderno'], s: 'el libro', h: 'Se lee, y también existe en braille y en audio.' },
+  { q: 'No muerde ni ladra, pero tiene dientes y la casa guarda. ¿Qué es?', a: ['llave'], s: 'la llave', h: 'La usas para abrir la puerta.' },
+  { q: 'Vengo de padres cantores, aunque yo no soy cantor. Traigo los hábitos blancos y amarillo el corazón. ¿Qué soy?', a: ['huevo'], s: 'el huevo', h: 'Lo pone la gallina.' },
+  { q: 'Llevo mi casa al hombro, camino sin tener patas, y voy dejando mi huella con un hilito de plata. ¿Qué soy?', a: ['caracol'], s: 'el caracol', h: 'Soy un animal pequeño y muy lento.' },
+  { q: 'Por fuera soy verde, por dentro soy roja, y tengo pepitas negras. ¿Qué fruta soy?', a: ['sandia'], s: 'la sandía', h: 'Soy una fruta grande y jugosa del verano.' },
+  { q: 'Cuatro patas tiene y no puede andar. También tiene cabecera y no sabe hablar. ¿Qué es?', a: ['cama'], s: 'la cama', h: 'En ella duermes cada noche.' },
+  { q: 'Salgo de la sala, voy a la cocina, meneando la cola como una gallina. ¿Qué soy?', a: ['escoba'], s: 'la escoba', h: 'Sirvo para barrer.' },
+  { q: 'Dos compañeras van al compás, con los pies delante y los ojos detrás. ¿Qué son?', a: ['tijera'], s: 'las tijeras', h: 'Sirven para cortar papel o tela.' },
+  { q: 'Tiene ojos y no ve, tiene agua y no la bebe, tiene carne y no la come, tiene barba y no es hombre. ¿Qué es?', a: ['coco'], s: 'el coco', h: 'Es un fruto duro que crece en las palmeras.' },
+  { q: 'Lana sube, lana baja. ¿Qué es?', a: ['navaja'], s: 'la navaja', h: 'Junta las dos últimas palabras de la adivinanza.' },
+  { q: 'Agua pasa por mi casa, cate de mi corazón. ¿Qué es?', a: ['aguacate', 'palta'], s: 'el aguacate, que en Chile llamamos palta', h: 'Une la primera palabra con la palabra cate. Es verde y se come con pan.' }
+];
+const WORDS = {
+  a: ['árbol', 'avión', 'amigo', 'abeja', 'anillo', 'arena', 'azúcar', 'almohada', 'araña', 'águila', 'arroz', 'abrigo', 'antena', 'aceite'],
+  b: ['barco', 'botella', 'bosque', 'balón', 'bandera', 'burro', 'bicicleta', 'boca', 'brazo', 'botón'],
+  c: ['casa', 'camino', 'corazón', 'cuchara', 'cielo', 'campana', 'conejo', 'ciudad', 'canción', 'caballo', 'cama', 'collar'],
+  d: ['dedo', 'diente', 'dado', 'delfín', 'dinero', 'durazno', 'ducha', 'doctor', 'dragón', 'danza'],
+  e: ['elefante', 'escuela', 'estrella', 'espejo', 'escalera', 'enero', 'edificio', 'escoba', 'espalda', 'enchufe'],
+  f: ['flor', 'fuego', 'familia', 'fiesta', 'foca', 'farol', 'fruta', 'fútbol', 'frazada', 'fuente'],
+  g: ['gato', 'guitarra', 'globo', 'gallina', 'guante', 'girasol', 'goma', 'gente', 'golondrina', 'garaje'],
+  h: ['hoja', 'hielo', 'hormiga', 'huevo', 'hermano', 'hospital', 'harina', 'helado', 'hombro', 'historia'],
+  i: ['isla', 'iglesia', 'idea', 'invierno', 'iguana', 'imán', 'insecto', 'idioma'],
+  j: ['jardín', 'jirafa', 'jabón', 'juego', 'jarra', 'joya', 'jugo', 'jaula'],
+  k: ['kilo', 'koala', 'kiwi', 'karate'],
+  l: ['luna', 'libro', 'lápiz', 'león', 'lluvia', 'lámpara', 'leche', 'limón', 'lana', 'lago'],
+  m: ['mesa', 'mano', 'montaña', 'música', 'manzana', 'mar', 'miel', 'mariposa', 'martillo', 'moneda'],
+  n: ['nube', 'noche', 'naranja', 'nariz', 'nido', 'nieve', 'número', 'nuez', 'niño', 'novela'],
+  'ñ': ['ñandú', 'ñoqui'],
+  o: ['oso', 'ojo', 'oreja', 'océano', 'oveja', 'olla', 'otoño', 'oficina', 'olor', 'orquesta'],
+  p: ['perro', 'puerta', 'pan', 'pájaro', 'pelota', 'piedra', 'playa', 'papel', 'piano', 'pluma'],
+  q: ['queso', 'quince', 'química', 'quitasol'],
+  r: ['ratón', 'río', 'reloj', 'rosa', 'rana', 'regalo', 'radio', 'ropa', 'rueda', 'rodilla'],
+  s: ['sol', 'silla', 'sapo', 'sombrero', 'semilla', 'sal', 'sandía', 'serpiente', 'sonido', 'sueño'],
+  t: ['taza', 'tren', 'tigre', 'tomate', 'tambor', 'teléfono', 'tierra', 'tortuga', 'torre', 'techo'],
+  u: ['uva', 'uña', 'universo', 'uniforme', 'unicornio', 'utensilio'],
+  v: ['vaca', 'ventana', 'viento', 'violín', 'vaso', 'verano', 'vela', 'volcán', 'vestido', 'voz'],
+  y: ['yate', 'yema', 'yogur', 'yegua'],
+  z: ['zapato', 'zorro', 'zanahoria', 'zona', 'zapallo', 'zumo']
+};
+const HUNT = ['cup', 'bottle', 'book', 'remote', 'spoon', 'fork', 'banana', 'apple', 'orange', 'chair', 'couch', 'bed', 'backpack', 'bowl', 'keyboard', 'toothbrush', 'teddy bear', 'umbrella', 'clock', 'potted plant', 'handbag', 'laptop', 'tv'];
+const TONES = [262, 330, 392, 523];
+const ADVENTURE_SYS = 'Eres el narrador de una aventura interactiva de audio, en español, para una persona ciega. Narra en segunda persona y describe con sonidos, texturas, olores y temperaturas en lugar de imágenes. Acepta tanto las opciones numeradas como las acciones libres que proponga la persona. Tono apto para todas las edades. Después de unos ocho turnos lleva la historia a un final y termina con la frase: Fin de la aventura. Usa solo texto plano, sin markdown ni emojis.';
+const ADVENTURE_FORMAT = ' (Formato obligatorio de tu respuesta: primero la narración, en cuatro oraciones como máximo; después dos o tres opciones escritas así: "Opción 1: ... Opción 2: ..."; y al final la pregunta "¿Qué haces?".)';
+
+async function startGame(def) {
+  hideCard();
+  const g = def.make();
+  g.def = def; S.game = g;
+  await g.start();
+}
+async function endGame(msg) {
+  const g = S.game; S.game = null;
+  if (g && g.cleanup) g.cleanup();
+  hideCard();
+  if (msg) await say(msg);
+}
+async function offerReplay(def, summary) {
+  const g = S.game; S.game = null;
+  if (g && g.cleanup) g.cleanup();
+  hideCard();
+  const a = await ask(`${summary} ¿Jugamos otra vez? Di sí o no.`);
+  if (a.silent) return;
+  if (NO_RE.test(a.t)) return say('Listo. Cuando quieras otro juego, di jugar. ¿Qué más quieres hacer?');
+  if (YES_RE.test(a.t)) return startGame(def);
+  const other = findGame(a.t);
+  if (other) return startGame(other);
+  if (await reroute(a)) return;
+  return say('Lo tomo como un no. Cuando quieras jugar de nuevo, di jugar.');
+}
+async function gameInput(t, raw) {
+  const g = S.game;
+  const exit = g.greedy ? /^(me rindo|salir|salir del juego|terminar (el )?juego|termina el juego)$/ : EXIT_GAME_RE;
+  if (exit.test(t)) { const bye = g.bye ? g.bye() + ' ' : ''; return endGame(bye + 'Salimos del juego. ¿Qué quieres hacer ahora?'); }
+  if (!g.greedy && /^(ayuda|reglas|instrucciones|como se juega|que hago|que tengo que hacer)$/.test(t)) return say(g.help());
+  return g.handle(t, raw);
+}
+
+class NumberGame {
+  async start() {
+    this.n = 1 + rand(100); this.tries = 0;
+    await say('Adivina el número. Pensé un número del 1 al 100. Tú me dices uno y yo te digo si el mío es mayor o menor. ¿Cuál es tu primer intento?');
+  }
+  help() { return 'Di un número del 1 al 100. Yo te digo si el mío es mayor o menor. Para terminar, di salir.'; }
+  async handle(t) {
+    const g = parseNumber(t);
+    if (g === null || g < 1 || g > 100) return say('Dime un número entre 1 y 100.');
+    this.tries++;
+    if (g === this.n) {
+      Sound.ok(); buzz([60, 40, 60]); await sleep(350);
+      return offerReplay(this.def, `¡Correcto! Era el ${this.n}. Lo lograste en ${this.tries} ${this.tries === 1 ? 'intento' : 'intentos'}.`);
+    }
+    await say(g < this.n ? `Mi número es mayor que ${g}.` : `Mi número es menor que ${g}.`);
+  }
+}
+
+class TriviaGame {
+  async start() {
+    this.qs = shuffle(TRIVIA).slice(0, 5); this.i = 0; this.score = 0;
+    await this.askQ('Trivia. Son cinco preguntas con tres opciones. Responde con el número de la opción o diciendo la respuesta. ');
+  }
+  help() { return 'Te hago cinco preguntas con tres opciones. Responde diciendo uno, dos o tres, o diciendo la respuesta. Di repite para escuchar la pregunta otra vez, o salir para terminar.'; }
+  cleanup() { hideCard(); }
+  async askQ(prefix) {
+    const q = this.qs[this.i], order = shuffle([0, 1, 2]);
+    this.opts = order.map(k => q.o[k]); this.correct = order.indexOf(q.c);
+    showCard(choiceCard(q.q, this.opts.map((o, i) => ({ label: cap(o), say: String(i + 1), num: String(i + 1) })), { cancel: false }));
+    await say(`${prefix}Pregunta ${this.i + 1} de ${this.qs.length}. ${q.q} Opción 1: ${this.opts[0]}. Opción 2: ${this.opts[1]}. Opción 3: ${this.opts[2]}.`);
+  }
+  match(t) {
+    const n = parseNumber(t);
+    if (n !== null) { const k = this.opts.findIndex(o => /^\d+$/.test(o) && +o === n); if (k >= 0) return k; }
+    const words = t.split(' '), skip = new Set(['el', 'la', 'los', 'las', 'de', 'del', 'un', 'una']);
+    const scores = this.opts.map(o => {
+      const ow = norm(o).split(' ').filter(w => !skip.has(w) && !/^\d+$/.test(w));
+      return ow.length ? ow.filter(w => words.includes(w)).length / ow.length : 0;
+    });
+    const best = Math.max(...scores);
+    if (best > 0 && scores.filter(s => s === best).length === 1) return scores.indexOf(best);
+    if (/\b(primera|primero|primer)\b/.test(t)) return 0;
+    if (/\b(segunda|segundo)\b/.test(t)) return 1;
+    if (/\b(tercera|tercero|tercer)\b/.test(t)) return 2;
+    if (n !== null && n >= 1 && n <= 3) return n - 1;
+    return -1;
+  }
+  async handle(t) {
+    const k = this.match(t);
+    if (k < 0) return say('No entendí tu respuesta. Di uno, dos o tres. O di repite para escuchar la pregunta otra vez.');
+    let msg;
+    if (k === this.correct) { this.score++; Sound.ok(); buzz(40); msg = pick(['¡Correcto!', '¡Muy bien!', '¡Exacto!']); }
+    else { Sound.bad(); buzz([120, 60, 120]); msg = `No. La respuesta correcta era ${this.opts[this.correct]}.`; }
+    await sleep(380);
+    this.i++;
+    if (this.i >= this.qs.length) return offerReplay(this.def, `${msg} Terminamos. Acertaste ${this.score} de ${this.qs.length}.`);
+    await this.askQ(msg + ' ');
+  }
+}
+
+class RiddleGame {
+  async start() {
+    this.qs = shuffle(RIDDLES).slice(0, 4); this.i = 0; this.score = 0; this.tries = 0;
+    await say(`Adivinanzas. Te voy a decir cuatro. Si necesitas ayuda, di pista. Si no la sabes, di paso. Primera adivinanza: ${this.qs[0].q}`);
+  }
+  help() { return 'Escucha la adivinanza y dime la respuesta. Di pista para recibir ayuda, paso para saltarla, repite para escucharla otra vez, o salir para terminar.'; }
+  async handle(t) {
+    const r = this.qs[this.i];
+    if (/\bpista\b|\bayudame\b|\buna ayuda\b/.test(t)) return say('Pista: ' + r.h);
+    const giveUp = /^(paso|pasar|no se|no lo se|ni idea|me rindo|siguiente|la respuesta|dime la respuesta|cual es)\b/.test(t);
+    const ok = !giveUp && r.a.some(k => new RegExp('\\b' + k + '(s|es)?\\b').test(t));
+    let msg;
+    if (ok) { this.score++; Sound.ok(); buzz(40); msg = `¡Correcto! Es ${r.s}.`; }
+    else if (!giveUp && ++this.tries < 3) {
+      Sound.bad(); await sleep(380);
+      return say(`${pick(['No es eso.', 'Todavía no.', 'No, sigue intentando.'])} ${this.tries === 2 ? 'Te queda un intento. ' : ''}Prueba otra vez, o di pista.`);
+    }
+    else msg = `La respuesta era ${r.s}.`;
+    await sleep(ok ? 380 : 0);
+    this.i++; this.tries = 0;
+    if (this.i >= this.qs.length) return offerReplay(this.def, `${msg} Terminamos. Adivinaste ${this.score} de ${this.qs.length}.`);
+    await say(`${msg} Siguiente adivinanza: ${this.qs[this.i].q}`);
+  }
+}
+
+function padsCard() {
+  const grid = el('div', { class: 'pads' });
+  ['grave', 'medio grave', 'medio agudo', 'agudo'].forEach((name, i) => {
+    grid.append(el('button', { type: 'button', class: 'pad', 'data-pad': String(i + 1), 'aria-label': `Sonido ${i + 1}, ${name}` }, String(i + 1), el('small', {}, name)));
+  });
+  return el('div', {}, el('h2', { class: 'card-title' }, 'Memoria de sonidos'), grid);
+}
+function parseSeq(t) {
+  const out = [];
+  for (const w of norm(t).split(' ')) {
+    if (/^\d+$/.test(w)) for (const ch of w) out.push(+ch >= 1 && +ch <= 4 ? +ch : 0);
+    else if (w === 'uno' || w === 'un' || w === 'una') out.push(1);
+    else if (w === 'dos') out.push(2);
+    else if (w === 'tres') out.push(3);
+    else if (w === 'cuatro') out.push(4);
+  }
+  return out;
+}
+class SimonGame {
+  constructor() { this.seq = []; this.input = []; this.accepting = false; }
+  get level() { return this.seq.length - 1; }
+  help() { return 'Escucha la secuencia de sonidos y repítela diciendo los números en orden, por ejemplo: uno, tres. También puedes tocar los cuatro botones de la pantalla. Di repite para escucharla otra vez, o salir para terminar.'; }
+  cleanup() { hideCard(); }
+  beep(n, dur = .4) {
+    const b = $(`[data-pad="${n}"]`, els.card);
+    if (b) { b.classList.add('lit'); setTimeout(() => b.classList.remove('lit'), dur * 1000); }
+    Sound.tone(TONES[n - 1], dur, { type: 'triangle', gain: .28 });
+    return sleep(dur * 1000);
+  }
+  async start() {
+    showCard(padsCard());
+    if (!(await say('Memoria de sonidos. Hay cuatro sonidos, numerados del uno, el más grave, al cuatro, el más agudo. Escúchalos.', { listen: false }))) return;
+    for (let i = 1; i <= 4; i++) {
+      if (S.game !== this) return;
+      if (!(await say(NUM_LABEL[i] + '.', { listen: false }))) return;
+      await this.beep(i); await sleep(250);
+    }
+    if (S.game !== this) return;
+    if (!(await say('Yo toco una secuencia y tú la repites diciendo los números, o tocando los cuatro botones de la pantalla. Empezamos.', { listen: false }))) return;
+    this.seq = [1 + rand(4), 1 + rand(4)];
+    await this.round();
+  }
+  async round() {
+    this.accepting = false; this.input = [];
+    const whole = await say(`Nivel ${this.level}. Escucha.`, { listen: false });
+    if (S.game !== this) return;
+    if (whole) {
+      await sleep(250);
+      for (const n of this.seq) { if (S.game !== this) return; await this.beep(n, .42); await sleep(150); }
+    }
+    this.accepting = true;
+    listenIfWanted();
+  }
+  repeat() { return this.round(); }
+  pad(n) {
+    TTS.stop(); Ear.stop(); lastSource = 'button';
+    this.beep(n, .25);
+    if (!this.accepting) return;
+    this.input.push(n);
+    if (this.input.length >= this.seq.length) { const got = this.input; this.input = []; this.check(got); }
+  }
+  async handle(t) {
+    const nums = parseSeq(t);
+    if (!nums.length) return say('Dime los números de los sonidos en orden. Por ejemplo: uno, tres. Si quieres oír la secuencia otra vez, di repite.');
+    await this.check(nums);
+  }
+  async check(nums) {
+    this.accepting = false;
+    const ok = nums.length === this.seq.length && nums.every((n, i) => n === this.seq[i]);
+    if (ok) { Sound.ok(); buzz(40); await sleep(550); this.seq.push(1 + rand(4)); return this.round(); }
+    Sound.bad(); buzz([120, 60, 120]); await sleep(550);
+    const done = this.level - 1;
+    return offerReplay(this.def, `No era esa. La secuencia era: ${this.seq.join(', ')}. Completaste ${done} ${done === 1 ? 'nivel' : 'niveles'}.`);
+  }
+}
+
+class MathGame {
+  async start() {
+    this.i = 0; this.score = 0; this.total = 6;
+    this.make();
+    await say(`Cálculo mental. Son seis operaciones, cada vez más difíciles. Primera: ¿cuánto es ${this.text}?`);
+  }
+  help() { return 'Te digo una operación y tú me dices el resultado. Di repite para escucharla otra vez, paso para saltarla, o salir para terminar.'; }
+  make() {
+    const lvl = this.i < 2 ? 0 : this.i < 4 ? 1 : 2, m = [10, 40, 90][lvl];
+    const type = pick(lvl === 0 ? ['+', '-'] : ['+', '-', 'x']);
+    let a = 1 + rand(m), b = 1 + rand(m);
+    if (type === '+') { this.ans = a + b; this.text = `${a} más ${b}`; }
+    else if (type === '-') { if (b > a) [a, b] = [b, a]; this.ans = a - b; this.text = `${a} menos ${b}`; }
+    else { a = 2 + rand(lvl === 1 ? 8 : 11); b = 2 + rand(8); this.ans = a * b; this.text = `${a} por ${b}`; }
+  }
+  async handle(t) {
+    const pass = /^(paso|pasar|no se|no lo se|ni idea|siguiente)\b/.test(t);
+    const n = pass ? null : parseNumber(t);
+    if (!pass && n === null) return say(`Dime un número. La operación es: ${this.text}.`);
+    let msg;
+    if (n === this.ans) { this.score++; Sound.ok(); buzz(40); msg = pick(['¡Correcto!', '¡Bien!', '¡Exacto!']); }
+    else { if (!pass) { Sound.bad(); buzz([120, 60, 120]); } msg = `${pass ? 'El resultado era' : 'No. Era'} ${this.ans}.`; }
+    await sleep(380);
+    this.i++;
+    if (this.i >= this.total) return offerReplay(this.def, `${msg} Terminamos. Acertaste ${this.score} de ${this.total}.`);
+    this.make();
+    await say(`${msg} Siguiente: ¿cuánto es ${this.text}?`);
+  }
+}
+
+const letterName = L => 'la letra ' + L.toUpperCase();
+class ChainGame {
+  constructor() { this.greedy = true; this.used = new Set(); this.count = 0; this.strikes = 0; }
+  setWord(w) { this.word = w; this.used.add(normWord(w)); this.need = normWord(w).slice(-1); }
+  bye() { return `Encadenaste ${this.count} ${this.count === 1 ? 'palabra' : 'palabras'}.`; }
+  async start() {
+    this.setWord(pick(Object.values(WORDS).flat()));
+    await say(`Palabras encadenadas. Yo digo una palabra y tú dices otra que empiece con la última letra de la mía. No vale repetir. Para terminar, di salir o me rindo. Empiezo yo: ${this.word}. Te toca una palabra con ${letterName(this.need)}.`);
+  }
+  async handle(t, raw) {
+    if (/^(repite|repitelo|repetir|que palabra era|cual era|ayuda)$/.test(t)) return say(`Mi palabra es ${this.word}. Te toca una que empiece con ${letterName(this.need)}. Para terminar, di me rindo.`);
+    const said = String(raw).toLowerCase().split(/[^a-záéíóúüñ]+/).filter(Boolean).map(x => ({ shown: x, w: normWord(x) })).filter(x => x.w.length > 1);
+    if (!said.length) return say(`Dime una palabra que empiece con ${letterName(this.need)}.`);
+    const chosen = said.find(x => x.w[0] === this.need) || said[said.length - 1], w = chosen.w, shown = cap(chosen.shown);
+    if (w[0] !== this.need) return this.strike(`${shown} no empieza con ${letterName(this.need)}.`);
+    if (this.used.has(w)) return this.strike(`${shown} ya se dijo.`);
+    this.used.add(w); this.count++;
+    const L = w.slice(-1), options = (WORDS[L] || []).filter(x => !this.used.has(normWord(x)));
+    if (!options.length) {
+      Sound.ok(); buzz([60, 40, 60]); await sleep(350);
+      return offerReplay(this.def, `${shown}. No se me ocurre ninguna palabra con ${letterName(L)}. ¡Me ganaste! ${this.bye()}`);
+    }
+    this.setWord(pick(options));
+    await say(`${cap(this.word)}. Te toca con ${letterName(this.need)}.`);
+  }
+  async strike(why) {
+    this.strikes++; Sound.bad(); buzz([120, 60, 120]); await sleep(380);
+    if (this.strikes >= 3) return offerReplay(this.def, `${why} Fue tu tercer error, así que termina la partida. ${this.bye()}`);
+    const left = 3 - this.strikes;
+    await say(`${why} Mi palabra es ${this.word}: necesito una que empiece con ${letterName(this.need)}. Te ${left === 1 ? 'queda una oportunidad' : 'quedan ' + left + ' oportunidades'}.`);
+  }
+}
+
+class HuntGame {
+  constructor() { this.usesBoxes = true; this.alive = false; }
+  help() { return `Busca con las manos el objeto que te pido y muéstramelo frente a la cámara. Ahora busco ${withUn(this.target)}. Di pasar para cambiar de objeto, qué ves para saber lo que veo, o salir para terminar.`; }
+  cleanup() { this.alive = false; clearBoxes(); }
+  get target() { return this.items[this.i]; }
+  async start() {
+    const camOk = await ensureCamera();
+    if (!camOk) { if (S.game === this) S.game = null; return; }
+    if (S.game !== this) return;
+    if (!Vision.model) {
+      await say('Estoy preparando la visión. La primera vez tarda unos segundos.', { listen: false });
+      if (S.game !== this) return;
+      startThinking();
+      try { await Vision.load(); } catch (e) { stopThinking(); if (S.game === this) await endGame(VISION_ERR); return; }
+      stopThinking();
+      if (S.game !== this) return;
+    }
+    this.items = shuffle(HUNT).slice(0, 5); this.i = 0; this.score = 0; this.alive = true; this.t0 = Date.now(); this.nudged = false;
+    await say(`Búsqueda del tesoro. Te voy a pedir ${this.items.length} objetos de tu casa. Búscalos con las manos y muéstramelos frente a la cámara. Di pasar para cambiar de objeto, o salir para terminar. Primer objeto: ${withUn(this.target)}.`);
+    this.loop();
+  }
+  async loop() {
+    while (this.alive && S.game === this) {
+      await sleep(850);
+      if (!this.alive || S.game !== this) break;
+      if (!Cam.active) { this.alive = false; await endGame('La cámara se apagó, así que terminamos el juego.'); break; }
+      if (TTS.speaking || Ear.hearing || ui.state === 'thinking' || S.pending) continue;
+      let preds;
+      try { preds = await Vision.detect(.45); } catch (e) { continue; }
+      if (!this.alive || S.game !== this) break;
+      drawBoxes(preds);
+      if (preds.some(p => p.class === this.target)) await this.next(true);
+      else if (!this.nudged && Date.now() - this.t0 > 45000) { this.nudged = true; await say(`Sigo esperando ${withUn(this.target)}. Si no tienes, di pasar.`); }
+    }
+  }
+  async next(found) {
+    const prev = this.target;
+    if (found) { this.score++; Sound.ok(); buzz([60, 40, 60]); await sleep(350); }
+    this.i++; this.t0 = Date.now(); this.nudged = false;
+    const head = found ? `¡Muy bien! Veo ${withEl(prev)}.` : `Pasamos ${withEl(prev)}.`;
+    if (this.i >= this.items.length) { this.alive = false; return offerReplay(this.def, `${head} Terminamos. Encontraste ${this.score} de ${this.items.length} objetos.`); }
+    await say(`${head} Ahora busca ${withUn(this.target)}.`);
+  }
+  async handle(t) {
+    if (/^(pasar|paso|pasa|otro|otra|siguiente|no tengo|cambiar|cambia)\b/.test(t)) return this.next(false);
+    if (/\bque ves\b|\bpista\b|\bque hay\b/.test(t)) {
+      let preds = [];
+      try { preds = await Vision.detect(.45); } catch (e) {}
+      const groups = summarize(preds);
+      return say((groups.length ? 'Ahora veo ' + listJoin(groups.map(groupPhrase)) + '.' : 'Ahora no reconozco ningún objeto.') + ` Sigo buscando ${withUn(this.target)}.`);
+    }
+    await say(`Estoy buscando ${withUn(this.target)}. Muéstramelo frente a la cámara, o di pasar.`);
+  }
+}
+
+class AdventureGame {
+  constructor() { this.h = []; }
+  help() { return 'Yo narro una historia y tú decides qué hacer. Responde con el número de una opción o di con tus palabras lo que quieres hacer. Di repite para escuchar otra vez, o salir para terminar.'; }
+  async start() {
+    if (!(await say('Aventura narrada. Dame un momento, estoy creando una historia para ti.', { listen: false }))) return;
+    const place = pick(['una isla misteriosa', 'un bosque del sur de Chile en plena noche', 'una nave espacial', 'un castillo antiguo', 'un mercado lleno de gente en una ciudad desconocida', 'una cueva junto al mar']);
+    await this.turn(`Empieza una aventura nueva ambientada en ${place}.`);
+  }
+  async turn(text) {
+    startThinking();
+    const r = await aiText([{ role: 'system', content: ADVENTURE_SYS }, ...this.h, { role: 'user', content: text + ADVENTURE_FORMAT }]);
+    stopThinking();
+    if (S.game !== this) return;
+    if (!r) return endGame('La aventura narrada necesita a la inteligencia artificial en línea. ' + aiBusyText() + ' Puedes probar otro juego diciendo jugar.');
+    const out = plain(r);
+    this.h.push({ role: 'user', content: text }, { role: 'assistant', content: out });
+    if (this.h.length > 16) this.h.splice(2, this.h.length - 16);
+    if (/fin de la aventura/i.test(out)) return offerReplay(this.def, out);
+    await say(/\?\s*$/.test(out) ? out : out + ' ¿Qué haces?');
+  }
+  handle(t, raw) { return this.turn(raw); }
+}
+
+const GAMES = [
+  { name: 'Adivina el número', re: /\bnumero\b|adivina el/, make: () => new NumberGame() },
+  { name: 'Trivia', re: /trivia|preguntas/, make: () => new TriviaGame() },
+  { name: 'Adivinanzas', re: /adivinanza|acertijo/, make: () => new RiddleGame() },
+  { name: 'Memoria de sonidos', re: /memoria|sonidos|simon/, make: () => new SimonGame() },
+  { name: 'Cálculo mental', re: /calculo|matematica|sumas/, make: () => new MathGame() },
+  { name: 'Palabras encadenadas', re: /palabras|encadenad/, make: () => new ChainGame() },
+  { name: 'Búsqueda del tesoro', extra: ', con la cámara', re: /tesoro|busqueda|buscar objetos/, make: () => new HuntGame() },
+  { name: 'Aventura narrada', re: /aventura|historia|cuento/, make: () => new AdventureGame() }
+];
+const findGame = t => GAMES.find(g => g.re.test(t)) || null;
+async function gamesEntry(t) {
+  let def = findGame(t);
+  if (!def) {
+    showCard(choiceCard('Elige un juego', GAMES.map((g, i) => ({ label: g.name, say: g.name, num: String(i + 1) })), { cols: 2, menu: true }));
+    const a = await ask(`Tengo ${GAMES.length} juegos. ${GAMES.map((g, i) => `${NUM_LABEL[i + 1]}: ${g.name.toLowerCase()}${g.extra || ''}`).join('. ')}. Di el nombre o el número del juego.`);
+    hideCard();
+    if (a.silent) return;
+    def = findGame(a.t);
+    if (!def) { const n = parseNumber(a.t); if (n >= 1 && n <= GAMES.length) def = GAMES[n - 1]; }
+    if (!def) {
+      if (CANCEL_RE.test(a.t)) return say('De acuerdo, no jugamos ahora.');
+      const it = findIntent(a.t);
+      if (it && it.id !== 'games') { S.op++; return it.run(a.t, a.raw); }
+      return say('No encontré ese juego. Di jugar para escuchar la lista otra vez.');
+    }
+  }
+  return startGame(def);
+}
+
+/* =====================================================================
+   12. COMANDOS: QUÉ FRASE ACTIVA QUÉ FUNCIÓN
+   ===================================================================== */
+const INTENTS = [
+  { id: 'camOff', re: /\b(apag|cerr|cierr|desactiv|deshabilit|quit|deten|desconect)\w*\s+(la |mi |esa |esta )?(camara|camera|webcam)\b/, run: cameraOff },
+  { id: 'camList', re: /\b(que|cuales|cuantas|lista\w*|enumera\w*|dime las) camaras\b|\bcamaras (disponibles|conectadas|hay|tengo)\b/, run: listCameras },
+  { id: 'camSwitch', re: /\b(cambi\w*|otra|siguiente|elegir|elige|escoger|escoge|seleccion\w*)\s+(de |la |a la |otra |a )?(camara|camera|webcam)\b/, run: t => chooseCamera(parseCamKind(t)) },
+  { id: 'camOn', re: /\b(activ|abr|enciend|encend|prend|habilit|inici|conect|us|pon|quiero|necesito)\w*\s+(la |una |mi |el )?(camara|camera|webcam)\b|^(la )?(camara|webcam)( (frontal|delantera|selfie|trasera|principal|posterior|externa|usb|web|de atras|de adelante|del frente))?$/, run: t => chooseCamera(parseCamKind(t)) },
+  { id: 'torch', re: /\blinterna\b|\bflash\b|\b(enciende|prende|apaga|activa) la luz\b/, run: t => torch(/\b(apag|desactiv|quit)/.test(t) ? false : /\b(enciend|encend|prend|activ|pon)/.test(t) ? true : null) },
+  { id: 'exploreStop', re: /\b(deten\w*|para\w*|termin\w*|deja de|apag\w*|desactiv\w*|sal\w* de)\s+(la |el |de |del )?(explor\w*|modo exploracion|deteccion)\b/, run: exploreStop },
+  { id: 'explore', re: /^explor\w*( (el|mi) (lugar|entorno|alrededor))?$|\bmodo (exploracion|explorar|guia|continuo)\b|\bdetect\w* (los )?objetos\b|\b(empieza|comienza|inicia|activa)\w* (a |la |el modo )?explor\w*\b|\bavisame (lo|de lo) que (ves|hay)\b/, run: exploreStart },
+  { id: 'read', re: /^(lee|leer|leeme|lea|leelo)\b|\b(lee|leer|leeme) (el |este |la |esta |un |lo |lo que dice )?(texto|cartel|letrero|papel|etiqueta|documento|carta|libro|envase|caja|pantalla)\b|\bque dice (aqui|aca|esto|el|la|este|esta)\b|^que dice$/, run: readText },
+  { id: 'color', re: /\b(que|cual|de que) color\b|^color(es)?$|\bdetect\w* (el )?color\b|\bdime el color\b/, run: tellColor },
+  { id: 'light', re: /\bhay luz\b|\besta (oscuro|claro)\b|\b(esta|estan) (prendida|encendida|apagada)s? las? luz\b|\b(nivel|cantidad) de luz\b|\bluz (esta )?(encendida|prendida|apagada)\b|\bcuanta luz\b/, run: tellLight },
+  { id: 'describe', re: /\bque (ves|estas viendo|se ve|miras|observas)\b|\bque hay (aqui|aca|delante|adelante|al frente|enfrente|en frente|frente a mi|alrededor)\b|\bque tengo (delante|adelante|al frente|enfrente|en frente|en la mano|en mis manos)\b|\bdescrib\w* (lo que (ves|hay)|la (escena|imagen|habitacion|pieza)|el (lugar|entorno|ambiente)|mi entorno|esto|que ves)\b|^describ\w*$|\bque es esto\b|^mira( esto)?$|\bque estoy (viendo|apuntando|sosteniendo|mostrando)\b|\bdime (lo )?que ves\b/, run: (t, raw) => describeScene(raw) },
+  { id: 'time', re: /\bque hora\b|^(la )?hora$|\bdime la hora\b/, run: tellTime },
+  { id: 'date', re: /\bque (dia|fecha)\b|^(la )?fecha$|\ba cuanto estamos\b/, run: tellDate },
+  { id: 'battery', re: /\bbateria\b|\bcarga (del|de mi) (telefono|celular|movil)\b/, run: tellBattery },
+  { id: 'where', re: /\bdonde estoy\b|\bmi ubicacion\b|\bubicacion actual\b|\ben que (calle|lugar|ciudad|direccion) estoy\b|\bdonde me encuentro\b/, run: tellLocation },
+  { id: 'games', re: /\b(jugar|juguemos|juega conmigo|vamos a jugar)\b|^(juegos?|un juego|otro juego|lista de juegos|que juegos (tienes|hay))$|^(trivia|adivinanzas?|memoria( de sonidos)?|calculo( mental)?|palabras encadenadas|busqueda del tesoro|aventura( narrada)?|adivina el numero)$/, run: gamesEntry },
+  { id: 'rate', re: /\b(habla|hable|hablar|hablame) (mas |un poco mas |muy )?(rapido|lento|despacio|normal)\b|^mas (rapido|lento|despacio)$|\bvelocidad normal\b/, run: setRateByVoice },
+  { id: 'handsfree', re: /\bmanos libres\b|\bescucha continua\b/, run: toggleHandsFree },
+  { id: 'clear', re: /\b(borra|borrar|limpia|limpiar|elimina|eliminar) (la |el |todo el |toda la )?(conversacion|chat|historial|pantalla)\b/, run: clearChat },
+  { id: 'sos', re: /\bemergencia\b|\bauxilio\b|\bsocorro\b|\bllama\w* a mi contacto\b/, run: sos },
+  { id: 'help', re: /^(ayuda|ayudame|comandos|instrucciones|menu)$|\bque (puedes|sabes) hacer\b|\bque comandos\b|\bcomo (te uso|funcionas|se usa)\b|\bque funciones\b/, run: () => say(HELP) },
+  { id: 'joke', re: /\b(chiste|broma)\b/, run: () => say(pick(JOKES)) },
+  { id: 'cancel', re: /^(cancelar|cancela|cancelalo|olvidalo)$/, run: () => say('No hay nada que cancelar. ¿Qué quieres hacer?') },
+  { id: 'nothing', re: /^(nada|nada mas|ninguno|ninguna|eso es todo|no gracias|nada gracias)$/, run: () => say('De acuerdo. Aquí estaré cuando me necesites.', { listen: false }) },
+  { id: 'exit', re: /^(salir|sal|salgamos|terminar|me rindo|paso|pasar|pista)( del juego| de aqui| el juego)?$/, run: () => say('Ahora no hay ningún juego en curso. Di jugar para empezar uno.') },
+  { id: 'math', re: /^(cuanto (es|da|son)|calcula|calcular)\b.*\b(mas|menos|por|entre|dividido)\b/, run: (t, raw) => { const r = mathLocal(t); return r ? say(r) : chat(raw); } }
+];
+const findIntent = t => INTENTS.find(it => it.re.test(t)) || null;
+
+function stopAll() {
+  TTS.stop(); Ear.stop(); S.op++; stopThinking();
+  const wasExploring = S.exploring; S.exploring = false;
+  if (S.pending) { const r = S.pending; S.pending = null; hideCard(); r({ t: 'cancelar', raw: '', silent: true }); }
+  setState('idle');
+  if (wasExploring) say('Exploración detenida.', { listen: false }); else Sound.done();
+}
+
+/** Punto de entrada único: todo lo que la persona dice, escribe o toca pasa por aquí. */
+async function handleInput(raw, source) {
+  raw = String(raw || '').trim();
+  if (!raw) return;
+  lastSource = source || 'text';
+  Sound.init(); TTS.stop(); Ear.stop();
+  addMsg('user', raw);
+  const t = norm(raw);
+  if (!t) return;
+  try {
+    const greedy = S.game && S.game.greedy && !S.pending;
+    if (!greedy) {
+      if (STOP_RE.test(t)) return stopAll();
+      if (REPEAT_RE.test(t)) {
+        if (S.game && !S.pending && S.game.repeat) return await S.game.repeat();
+        if (S.lastSaid) return await say(S.lastSaid, { log: false });
+        return;
+      }
+    }
+    if (S.pending) { const r = S.pending; S.pending = null; r({ t, raw }); return; }
+    if (S.game) return await gameInput(t, raw);
+    S.op++;
+    const it = findIntent(t);
+    await (it ? it.run(t, raw) : chat(raw));
+  } catch (err) {
+    console.error(err);
+    stopThinking();
+    await say('Algo salió mal. Inténtalo otra vez.');
+  }
+}
+
+/* =====================================================================
+   13. AJUSTES (PANEL)
+   ===================================================================== */
+function fillVoiceSelect() {
+  const sel = $('#sVoiceSel'); if (!sel) return;
+  sel.replaceChildren(el('option', { value: '' }, 'Automática'));
+  for (const v of TTS.voices) sel.append(el('option', { value: v.voiceURI }, `${v.name} (${v.lang})`));
+  sel.value = TTS.voices.some(v => v.voiceURI === cfg.voiceURI) ? cfg.voiceURI : '';
+}
+function syncSettings() {
+  $('#sVoice').checked = cfg.voice; $('#sAuto').checked = cfg.autoListen; $('#sHands').checked = cfg.handsFree; $('#sVib').checked = cfg.vibrate;
+  $('#sRate').value = cfg.rate; $('#sLang').value = cfg.lang; $('#sAI').value = cfg.ai;
+  $('#sKey').value = cfg.geminiKey; $('#sModel').value = cfg.geminiModel; $('#sSos').value = cfg.sos;
+}
+function applyCfg() {
+  els.log.setAttribute('aria-live', cfg.voice ? 'off' : 'polite');
+  keepAwake(cfg.handsFree || Cam.active);
+  if (S.started && cfg.handsFree && ui.state === 'idle' && !els.dlg.open) Ear.start();
+}
+function bindSettings() {
+  const lang = $('#sLang');
+  for (const [code, name] of LANGS) lang.append(el('option', { value: code }, `Español (${name})`));
+  const bind = (sel, key, read) => $(sel).addEventListener('change', e => { cfg[key] = read(e.target); saveCfg(); applyCfg(); });
+  bind('#sVoice', 'voice', i => i.checked); bind('#sAuto', 'autoListen', i => i.checked);
+  bind('#sHands', 'handsFree', i => i.checked); bind('#sVib', 'vibrate', i => i.checked);
+  bind('#sRate', 'rate', i => +i.value); bind('#sLang', 'lang', i => i.value); bind('#sAI', 'ai', i => i.value);
+  bind('#sVoiceSel', 'voiceURI', i => i.value); bind('#sKey', 'geminiKey', i => i.value.trim());
+  bind('#sModel', 'geminiModel', i => i.value.trim() || 'gemini-flash-latest'); bind('#sSos', 'sos', i => i.value.trim());
+  $('#sKey').addEventListener('change', () => { S.tips.key = false; });
+  $('#sTest').addEventListener('click', () => { Sound.init(); say('Hola, soy Faro. Así suena mi voz.', { listen: false, log: false }); });
+  $('#btnSettings').addEventListener('click', () => { TTS.stop(); Ear.stop(); syncSettings(); fillVoiceSelect(); els.dlg.showModal(); });
+  $('#dlgClose').addEventListener('click', () => els.dlg.close());
+  els.dlg.addEventListener('click', e => { if (e.target === els.dlg) els.dlg.close(); });
+  els.dlg.addEventListener('close', () => { TTS.stop(); applyCfg(); });
+  syncSettings();
+}
+
+/* =====================================================================
+   14. INICIO Y EVENTOS
+   ===================================================================== */
+els.start.addEventListener('click', async () => {
+  Sound.init();
+  // iOS exige que la primera frase se lance dentro del toque.
+  if (TTS.ok) { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {} }
+  els.start.remove();
+  S.started = true;
+  els.mic.focus({ preventScroll: true });
+  if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) countCameras();
+  if (!window.isSecureContext || !navigator.mediaDevices) note('La cámara y el micrófono necesitan una dirección segura (https).');
+  lastSource = 'voice';
+  const first = !store.get('seen', false);
+  store.set('seen', true);
+  let hello = first
+    ? 'Hola, soy Faro, tu asistente de voz. El botón para hablar ocupa todo el ancho de la parte de abajo de la pantalla. Puedo activar la cámara y decirte lo que hay delante, leer textos, decirte la hora, conversar y jugar contigo. Di ayuda para conocer todos los comandos.'
+    : 'Hola de nuevo, soy Faro.';
+  if (!Ear.supported) hello += ' En este navegador no puedo escucharte, pero puedes escribirme. Para usar la voz, abre esta página en Chrome.';
+  await say(hello + ' ¿Qué quieres hacer?');
+});
+
+els.mic.addEventListener('click', () => {
+  Sound.init();
+  if (!Ear.supported) { say('Este navegador no permite el reconocimiento de voz. Escríbeme en el cuadro de texto, o abre esta página en Chrome.', { listen: false }); return; }
+  if (Ear.on) { Ear.finish(); return; }
+  TTS.stop();
+  Ear.denied = false;
+  lastSource = 'voice';
+  Ear.start();
+});
+function sendTyped() {
+  const v = els.txt.value;
+  els.txt.value = '';
+  handleInput(v, 'text');
+}
+$('#send').addEventListener('click', sendTyped);
+els.txt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); sendTyped(); } });
+els.txt.addEventListener('focus', () => Ear.stop());
+document.addEventListener('click', e => {
+  const pad = e.target.closest('[data-pad]');
+  if (pad) { Sound.init(); if (S.game && S.game.pad) S.game.pad(+pad.dataset.pad); return; }
+  const b = e.target.closest('[data-say]');
+  if (b) handleInput(b.dataset.say, 'button');
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.started && !els.dlg.open) stopAll(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) Ear.stop();
+  else if (Cam.active || cfg.handsFree) keepAwake(true);
+});
+window.addEventListener('pagehide', () => { TTS.stop(); Cam.stop(); });
+window.addEventListener('unhandledrejection', e => { console.error(e.reason); stopThinking(); });
+
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  let timer = null;
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const before = S.camCount;
+      await countCameras();
+      if (S.started && S.camPerm && before !== null && S.camCount > before) {
+        const msg = 'Detecté una cámara nueva conectada. Di cámara externa para usarla.';
+        if (ui.state === 'idle' && !S.pending) say(msg, { listen: false }); else note(msg);
+      }
+    }, 900);
+  });
+}
+
+TTS.load();
+bindSettings();
+applyCfg();
+setState('idle');
+
+// Acceso para pruebas automáticas.
+window.__faro = { S, cfg, Cam, Vision, OCR, TTS, Ear, handleInput, parseNumber, colorName, norm, findIntent, mathLocal, timePhrase };
+})();
+</script>
+</body>
+</html>
