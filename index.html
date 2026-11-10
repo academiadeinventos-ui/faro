@@ -130,6 +130,7 @@ legend{padding:0;margin-bottom:.2rem;font-size:.8rem;font-weight:800;letter-spac
 .row select,.row input[type=range]{flex:none;width:46%}
 .row.wide{flex-direction:column;align-items:stretch;gap:.4rem;padding:.65rem 0}
 .row.wide select,.row.wide .btn{width:100%}
+.row.wide .btn{white-space:normal;height:auto;min-height:48px;padding:.55rem .8rem;line-height:1.25}
 .btn{white-space:nowrap}
 select,.stack input{min-height:48px;padding:0 .7rem;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);width:100%}
 input[type=range]{accent-color:var(--amber);min-height:44px}
@@ -626,7 +627,8 @@ function listenIfWanted() { if (shouldAutoListen()) setTimeout(() => { if (!TTS.
 async function say(text, opts = {}) {
   text = String(text || '').trim();
   if (!text) return true;
-  S.lastSaid = text;
+  S.lastSaid = text;                                       // «repite» no vuelve a decir el aviso
+  if (opts.log !== false) text = takeNotice() + text;     // aviso pendiente: clave guardada o clave rechazada
   Ear.stop();
   if (opts.log !== false || !cfg.voice) addMsg('bot', text);
   const finished = await TTS.speak(text);
@@ -1026,7 +1028,7 @@ const OCR = {
     let lines;
     if (Array.isArray(data.lines) && data.lines.length) lines = data.lines.filter(l => l.confidence >= 55).map(l => l.text);
     else lines = (data.confidence || 0) >= 45 ? String(data.text || '').split('\n') : [];
-    lines = lines.map(s => s.replace(/\s+/g, ' ').trim()).filter(s => {
+    lines = lines.map(s => s.replace(/[|_~^`\\<>{}\[\]]+/g, ' ').replace(/\s+/g, ' ').trim()).filter(s => {
       const good = (s.match(/[a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ]/g) || []).length;
       return good >= 2 && good / s.length > .55;
     });
@@ -1038,6 +1040,12 @@ const OCR = {
    9. INTELIGENCIA ARTIFICIAL EN LÍNEA
    ===================================================================== */
 const SYSTEM = 'Eres Faro, un asistente de voz en español para una persona ciega o con baja visión. Habla como un acompañante humano, cercano y respetuoso: lenguaje natural, frases claras y ritmo tranquilo. Tus respuestas se leen en voz alta: usa solo texto plano, sin markdown, emojis ni listas con símbolos; usa dos o tres oraciones salvo que te pidan más. Trata a la persona de tú. Si no sabes algo o no estás seguro, dilo con honestidad en vez de inventar. No prometas seguridad física ni des instrucciones de navegación que puedan poner en riesgo a alguien.';
+const SIDEWALK = { 'es-CL': 'vereda', 'es-AR': 'vereda', 'es-BO': 'vereda', 'es-EC': 'vereda', 'es-PE': 'vereda', 'es-UY': 'vereda', 'es-CO': 'andén', 'es-MX': 'banqueta' };
+/** Pide al cerebro el español del país elegido en Ajustes, para que no diga «banqueta» a quien dice «vereda». */
+function regionHint() {
+  const country = (LANGS.find(l => l[0] === cfg.lang) || LANGS[0])[1];
+  return ` La persona vive en ${country}: habla con el español y las palabras de uso diario de ese país. Por ejemplo, al lugar por donde caminan los peatones llámalo ${SIDEWALK[cfg.lang] || 'acera'}.`;
+}
 const VISION_SYS = SYSTEM + ' Cuando recibas una imagen, eres los ojos de la persona: describe primero lo más importante y lo que esté más cerca, menciona objetos o posibles obstáculos solo si realmente son visibles, y usa posiciones como izquierda, derecha, al centro, cerca o lejos. Lee texto visible si lo hay. No digas "en la imagen" ni "en la foto". No identifiques a personas por su nombre. No afirmes que un camino está libre o que es seguro, y no indiques cruzar, avanzar o girar como una orden.';
 
 /* El cerebro no solo conversa: también decide cuándo usar una función de la aplicación.
@@ -1054,7 +1062,7 @@ const ACTIONS = {
   ayuda: 'ayuda', emergencia: 'emergencia', chiste: 'cuéntame un chiste'
 };
 const BRAIN_SYS = ' También eres el cerebro que maneja la aplicación. Cuando la persona pida algo que hace una función de la aplicación, no respondas con palabras: responde únicamente con una línea que diga ACCION: y el código de la función. Códigos disponibles: camara (encender la cámara sin decir cuál), camara_trasera, camara_frontal, camara_externa, apagar_camara, cambiar_camara, describir (saber qué hay delante o qué tiene en la mano), orientar (ubicarse o guiarse en el lugar), leer (leer un texto, cartel, envase, papel o pantalla), explorar (avisar objetos de forma continua), detener_explorar, color (saber un color), luz (saber si hay luz o está oscuro), linterna_on, linterna_off, hora, fecha, bateria, ubicacion (saber dónde está), juegos (quiere jugar sin decir a qué), trivia, adivinanzas, memoria, calculo, palabras, tesoro, aventura, numero (adivinar el número), manos_libres_on, manos_libres_off, mas_rapido, mas_lento, ayuda (saber qué puede hacer la aplicación), emergencia, chiste. Ejemplo: si dice "oye, ¿me puedes decir qué dice este papel?", respondes exactamente: ACCION: leer. Para todo lo demás, como preguntas, dudas o conversación, responde normalmente con palabras y sin usar ACCION.';
-const EYES_SYS = ' Junto con este mensaje recibes lo que la cámara ve en este momento. Si la pregunta se puede responder mirando, respóndela tú directamente, como los ojos de la persona, sin usar ACCION. Si la pregunta no tiene relación con lo que se ve, ignora la imagen.';
+const EYES_SYS = ' Junto con este mensaje recibes lo que la cámara ve en este momento. Si la pregunta se puede responder mirando, respóndela tú directamente, como los ojos de la persona, sin usar ACCION. Si la pregunta no tiene relación con lo que se ve, ignora la imagen. La persona no puede ver: describe con tus palabras y nunca le digas «como ves», «lo que ves», «en la imagen» ni «en la foto».';
 const ACTION_RE = /ACCI[OÓ]N\s*:\s*\**\s*([a-z_]+)/i;
 
 /* Cerebros con clave. Cada uno prueba sus modelos en orden y recuerda el primero que responde. */
@@ -1084,7 +1092,7 @@ const FREE_AI = [
   { name: 'Pollinations', url: 'https://text.pollinations.ai/openai', model: 'openai-fast', every: 46 }   // sin clave: una respuesta cada 45 segundos
 ];
 const AI = {
-  history: [], okModel: {}, notice: '', used: '',
+  history: [], okModel: {}, served: {}, notice: '', used: '',
   smart: () => cfg.ai !== 'local' && !!brainKey(),     // hay un cerebro con clave
   canSee: () => AI.smart()                             // los tres cerebros entienden imágenes
 };
@@ -1135,6 +1143,7 @@ async function callGemini(model, key, sys, turns, image, ms) {
   const j = await r.json(), c = j.candidates && j.candidates[0];
   const text = ((c && c.content && c.content.parts) || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
   if (!text) throw brainError((j.promptFeedback && j.promptFeedback.blockReason) || (c && /SAFETY|PROHIBITED|BLOCKLIST/.test(c.finishReason || '')) ? 'blocked' : 'busy', 'Gemini no entregó texto');
+  AI.served.gemini = String(j.modelVersion || model).replace(/^models\//, '');
   return text;
 }
 async function callOpenAI(model, key, sys, turns, image, ms) {
@@ -1182,7 +1191,7 @@ async function callClaude(model, key, sys, turns, image, ms) {
 const CALLERS = { gemini: callGemini, openai: callOpenAI, claude: callClaude };
 const modelCool = {};
 function resetBrain() {
-  AI.okModel = {}; AI.notice = '';
+  AI.okModel = {}; AI.served = {}; AI.notice = '';
   for (const k of Object.keys(modelCool)) delete modelCool[k];
   for (const k of Object.keys(S.tips)) if (k.startsWith('brain_')) delete S.tips[k];
 }
@@ -1203,6 +1212,7 @@ async function smartCall(messages, image) {
     try {
       const text = await CALLERS[id](model, key, sys, turns, image, Math.min(left, image ? 28000 : 20000));
       AI.okModel[id] = model; AI.used = def.name;
+      if (id !== 'gemini') AI.served[id] = model;
       return text;
     } catch (e) {
       last = e.kind ? e : brainError(e.name === 'AbortError' ? 'busy' : 'net', `${def.name}: ${e.name === 'AbortError' ? 'tardó demasiado en responder' : 'no hubo conexión'}`);
@@ -1294,7 +1304,7 @@ const camShot = (size, quality) => { const c = Cam.frame(size || 768); return c 
 async function aiVision(prompt, system, size) {
   const image = camShot(size);
   if (!image) throw brainError('busy', 'La cámara no entregó imagen');
-  return smartCall([{ role: 'system', content: system || VISION_SYS }, { role: 'user', content: prompt }], image);
+  return smartCall([{ role: 'system', content: (system || VISION_SYS) + regionHint() }, { role: 'user', content: prompt }], image);
 }
 
 const JOKES = [
@@ -1340,7 +1350,7 @@ async function chat(raw) {
   if (cfg.ai !== 'local' && navigator.onLine !== false) {
     startThinking();
     const now = new Date();
-    const when = ` Fecha y hora local de la persona: ${now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ${now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}.`;
+    const when = `${regionHint()} Fecha y hora local de la persona: ${now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ${now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}.`;
     const blind = `${SYSTEM}${BRAIN_SYS} La cámara está ${Cam.active ? 'encendida, pero en este mensaje no recibes su imagen' : 'apagada'}.${when}`;
     const turns = [...AI.history, { role: 'user', content: raw }];
     try {
@@ -1354,7 +1364,7 @@ async function chat(raw) {
     stopThinking();
     if (!alive()) return;
   }
-  if (!reply) return say(takeNotice() + localReply(raw));
+  if (!reply) return say(localReply(raw));
   const code = ((reply.match(ACTION_RE) || [])[1] || '').toLowerCase();
   const phrase = ACTIONS[code];
   if (phrase) {
@@ -1362,9 +1372,9 @@ async function chat(raw) {
     if (it) { remember(raw, 'ACCION: ' + code); return it.run(t, raw); }
   }
   reply = plain(reply.replace(/ACCI[OÓ]N\s*:\s*\**\s*[a-z_]*/gi, ' ')).trim();
-  if (!reply) return say(takeNotice() + localReply(raw));
+  if (!reply) return say(localReply(raw));
   remember(raw, reply);
-  await say(takeNotice() + reply);
+  await say(reply);
 }
 
 /** Dice qué inteligencia artificial está usando Faro. */
@@ -1372,7 +1382,7 @@ async function brainStatus() {
   const def = brainDef();
   if (cfg.ai === 'local') return say('Estoy en modo solo dispositivo: no uso ninguna inteligencia artificial en línea. Se cambia en Ajustes.');
   if (AI.smart()) {
-    const model = AI.okModel[brainId()];
+    const model = AI.served[brainId()] || AI.okModel[brainId()];
     return say(`Mi cerebro es ${def.name}, de ${def.maker}${model ? ', con el modelo ' + model.replace(/-/g, ' ') : ''}. Con él converso, entiendo lo que me pides con tus propias palabras y describo lo que ve la cámara.`);
   }
   await say('Ahora no tengo una clave de inteligencia artificial. Converso con servicios gratuitos más simples y reconozco objetos comunes con el propio teléfono. Con una clave gratuita de Gemini, de Google, que se agrega en Ajustes, puedo describir el entorno completo y entenderte mucho mejor.');
@@ -1394,7 +1404,7 @@ async function describeScene(raw) {
       return say(seen);
     } catch (e) { stopThinking(); if (!alive()) return; brainTrouble(e); }
   }
-  if (!Vision.model) { await say(takeNotice() + 'Estoy preparando la visión. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
+  if (!Vision.model) { await say('Estoy preparando la visión. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
   startThinking();
   let preds;
   try { preds = await Vision.detect(.5); } catch (e) { stopThinking(); if (alive()) await say(VISION_ERR); return; }
@@ -1402,7 +1412,7 @@ async function describeScene(raw) {
   drawBoxes(preds);
   if (!S.exploring) setTimeout(() => { if (!S.exploring && !(S.game && S.game.usesBoxes)) clearBoxes(); }, 5000);
   const groups = summarize(preds);
-  let text = takeNotice() + (groups.length ? 'Veo ' + listJoin(groups.map(groupPhrase)) + '.'
+  let text = (groups.length ? 'Veo ' + listJoin(groups.map(groupPhrase)) + '.'
     : 'No reconozco ningún objeto conocido frente a la cámara. Prueba mover el teléfono lentamente o alejarlo un poco.');
   if (luminance().avg < 40) text += ' Hay muy poca luz. Puedes decir: enciende la linterna.';
   if (!S.tips.vision && !AI.smart()) { S.tips.vision = true; text += ' Te aviso que así solo reconozco objetos comunes, y puedo equivocarme.'; }
@@ -1425,7 +1435,7 @@ async function orientMe(raw) {
       return say(r + ' ' + GUIDE_CAUTION);
     } catch (e) { stopThinking(); if (!alive()) return; brainTrouble(e); }
   }
-  if (!Vision.model) { await say(takeNotice() + 'Estoy preparando el reconocimiento local. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
+  if (!Vision.model) { await say('Estoy preparando el reconocimiento local. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
   startThinking();
   let preds;
   try { preds = await Vision.detect(.48); } catch (e) { stopThinking(); if (alive()) await say(VISION_ERR); return; }
@@ -1451,21 +1461,24 @@ async function listenNow() {
   await say('Te escucho.', { listen: true });
 }
 
-async function readText() {
+async function readText(raw) {
   if (!(await ensureCamera())) return;
   const my = S.op, alive = () => my === S.op;
   const NO_TEXT = 'No encontré texto que pueda leer. Acerca la cámara a unos 20 centímetros del texto, con buena luz, mantén el teléfono quieto y vuelve a decir: leer texto.';
   if (AI.canSee()) {
     startThinking();
     try {
-      const r = plain(await aiVision('Lee el texto visible. Transcríbelo tal cual, en el orden natural de lectura, sin agregar comentarios ni explicaciones. Si no hay texto legible, responde únicamente: SIN TEXTO.', SYSTEM, 1280));
+      const asked = String(raw || '').trim().slice(0, 200);
+      const r = plain(await aiVision((asked ? `La persona pidió: «${asked}». Si pidió un texto en particular, por ejemplo un letrero o una parte de un envase, lee ese; si no lo distingues, empieza diciendo «No distingo» y qué es lo que no encuentras, y a continuación lee de todos modos el otro texto que sí se vea, sin preguntar. Si no pidió uno en particular, lee todo el texto visible en el orden natural de lectura. ` : 'Lee todo el texto visible en el orden natural de lectura. ')
+        + 'Entrega solo el texto leído, tal cual está escrito, sin describir la escena ni agregar explicaciones. La persona no puede ver: no digas «en la imagen» ni «en la foto». Si una parte está cortada o borrosa, dilo al final en pocas palabras. Si no hay texto legible, responde únicamente: SIN TEXTO.', SYSTEM, 1280));
       stopThinking(); if (!alive()) return;
       if (/^sin texto/i.test(r)) return say(NO_TEXT);
-      remember('lee el texto que tengo delante', 'El texto dice: ' + r);
-      return say('El texto dice: ' + r);
+      const out = (/^(no |lo siento)/i.test(r) || /\b(dice|pone|se lee)\b/i.test(r.slice(0, 60)) ? '' : 'El texto dice: ') + r;
+      remember(asked || 'lee el texto que tengo delante', out);
+      return say(out);
     } catch (e) { stopThinking(); if (!alive()) return; brainTrouble(e); }
   }
-  await say(takeNotice() + (OCR.worker ? 'Leyendo. Mantén el teléfono quieto.' : 'Voy a leer. La primera vez tardo más, porque preparo el lector de texto. Mantén el teléfono quieto.'), { listen: false });
+  await say((OCR.worker ? 'Leyendo. Mantén el teléfono quieto.' : 'Voy a leer. La primera vez tardo más, porque preparo el lector de texto. Mantén el teléfono quieto.'), { listen: false });
   if (!alive() || !Cam.active) return;
   const canvas = Cam.frame(1600);
   startThinking();
@@ -2070,7 +2083,7 @@ const INTENTS = [
   { id: 'torch', re: /\blinterna\b|\bflash\b|\b(enciende|prende|apaga|activa) la luz\b/, run: t => torch(/\b(apag|desactiv|quit)/.test(t) ? false : /\b(enciend|encend|prend|activ|pon)/.test(t) ? true : null) },
   { id: 'exploreStop', re: /\b(deten\w*|para\w*|termin\w*|deja de|apag\w*|desactiv\w*|sal\w* de)\s+(la |el |de |del )?(explor\w*|modo exploracion|deteccion)\b/, run: exploreStop },
   { id: 'explore', re: /^explor\w*( (el|mi) (lugar|entorno|alrededor))?$|\bmodo (exploracion|explorar|guia|continuo)\b|\bdetect\w* (los )?objetos\b|\b(empieza|comienza|inicia|activa)\w* (a |la |el modo )?explor\w*\b|\bavisame (lo|de lo) que (ves|hay)\b/, run: exploreStart },
-  { id: 'read', re: /^(lee|leer|leeme|lea|leelo)\b|\b(lee|leer|leeme) (el |este |la |esta |un |lo |lo que dice )?(texto|cartel|letrero|papel|etiqueta|documento|carta|libro|envase|caja|pantalla)\b|\bque dice (aqui|aca|esto|el|la|este|esta)\b|^que dice$/, run: readText },
+  { id: 'read', re: /^(lee|leer|leeme|lea|leelo)\b|\b(lee|leer|leeme) (el |este |la |esta |un |lo |lo que dice )?(texto|cartel|letrero|papel|etiqueta|documento|carta|libro|envase|caja|pantalla)\b|\bque dice (aqui|aca|esto|el|la|este|esta)\b|^que dice$/, run: (t, raw) => readText(raw) },
   { id: 'color', re: /\b(que|cual|de que) color\b|^color(es)?$|\bdetect\w* (el )?color\b|\bdime el color\b/, run: tellColor },
   { id: 'light', re: /\bhay luz\b|\besta (oscuro|claro)\b|\b(esta|estan) (prendida|encendida|apagada)s? las? luz\b|\b(nivel|cantidad) de luz\b|\bluz (esta )?(encendida|prendida|apagada)\b|\bcuanta luz\b/, run: tellLight },
   { id: 'orient', re: /^(orientame|orientarme|orientar|guiame|guiarme|guia|dame orientacion|orientacion|como esta el (entorno|lugar|camino))$|\b(orientame|orientarme|guiame|guiarme|dame orientacion|describe.*(?:entorno|alrededor)|ayudame a orientarme)\b/, run: (t, raw) => orientMe(raw) },
@@ -2168,7 +2181,7 @@ async function probeBrain() {
   out.textContent = `Probando ${def.name}…`;
   try {
     const r = plain(await smartCall([{ role: 'system', content: 'Responde en español, con una sola frase corta y sin formato.' }, { role: 'user', content: 'Saluda y di que el cerebro de Faro está conectado.' }]));
-    out.textContent = `Funciona. ${def.name} respondió con el modelo ${AI.okModel[brainId()]}: «${r}»`;
+    out.textContent = `Funciona. ${def.name} respondió con el modelo ${AI.served[brainId()] || AI.okModel[brainId()]}: «${r}»`;
     await say(`Funciona. ${def.name} dice: ${r}`, { listen: false, log: false });
   } catch (e) { await tell(brainProblem(e)); }
 }
