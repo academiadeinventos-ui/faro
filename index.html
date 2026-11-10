@@ -239,17 +239,27 @@ input[type=range]{accent-color:var(--amber);min-height:44px}
       <div class="row"><label for="sVib">Vibración</label><input id="sVib" class="switch" type="checkbox" role="switch"></div>
     </fieldset>
     <fieldset>
-      <legend>Inteligencia artificial</legend>
-      <div class="row wide"><label for="sAI">Conversación</label><select id="sAI"><option value="auto">IA gratis en línea</option><option value="local">Solo en el dispositivo</option></select></div>
-      <div class="stack"><label for="sKey">Clave gratuita de Gemini para visión real<small>Gemini analiza una foto de la cámara y puede describir el entorno completo. La clave gratuita se crea en Google AI Studio y queda guardada solo en este teléfono.</small></label><input id="sKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí la clave gratuita"></div>
-      <p class="fine ai-link"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Crear una clave gratis de Gemini en Google AI Studio</a><br>Sin clave, Faro sigue reconociendo objetos comunes en el propio teléfono con TensorFlow.</p>
-      <div class="stack"><label for="sModel">Modelo de Gemini</label><input id="sModel" type="text" autocomplete="off" spellcheck="false"></div>
+      <legend>Cerebro de Faro</legend>
+      <div class="row wide"><label for="sBrain">Inteligencia artificial<small>Es la que conversa, entiende lo que pides con tus palabras y describe lo que ve la cámara.</small></label>
+        <select id="sBrain">
+          <option value="gemini">Gemini · gratis</option>
+          <option value="openai">ChatGPT · de pago</option>
+          <option value="claude">Claude · de pago</option>
+        </select></div>
+      <div class="stack"><label for="sKey"><span id="sKeyLabel">Clave de Gemini</span><small id="sKeyHelp"></small></label><input id="sKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Pega aquí la clave"></div>
+      <p class="fine ai-link"><a id="sKeyLink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Crear una clave gratuita de Gemini en Google AI Studio</a></p>
+      <div class="row wide"><button id="sProbe" class="btn" type="button">Probar el cerebro</button></div>
+      <p id="sProbeOut" class="fine" role="status" aria-live="polite"></p>
+      <div class="row wide"><button id="sShare" class="btn" type="button">Copiar enlace con la clave</button><small>Al abrir ese enlace en otro teléfono, la clave queda guardada allí. Compártelo solo con personas de confianza.</small></div>
+      <div class="stack"><label for="sModel">Modelo<small>Déjalo vacío para que Faro elija uno rápido y con buena cuota.</small></label><input id="sModel" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Automático"></div>
+      <div class="row wide"><label for="sAI">Uso de internet</label><select id="sAI"><option value="auto">En línea (recomendado)</option><option value="local">Solo en el dispositivo</option></select></div>
+      <p class="fine">Sin clave, Faro conversa con servicios gratuitos más simples y reconoce objetos comunes en el propio teléfono con TensorFlow. Con el cerebro activo, lo que dices y, si la cámara está encendida, una foto de lo que ve, se envían al servicio elegido para poder responder.</p>
     </fieldset>
     <fieldset>
       <legend>Emergencia</legend>
       <div class="stack"><label for="sSos">Teléfono de contacto<small>Al decir «emergencia» se abre el marcador con este número.</small></label><input id="sSos" type="tel" inputmode="tel" autocomplete="off" placeholder="+56 9 1234 5678"></div>
     </fieldset>
-    <p class="fine">Faro ofrece orientación descriptiva, no navegación segura. Puede equivocarse y no detecta todos los desniveles, vehículos, personas u obstáculos. No reemplaza al bastón, al perro guía, una app de navegación accesible ni a la ayuda de otra persona. La visión local usa TensorFlow.js y Tesseract.js; Gemini es la opción gratuita de IA real para describir el entorno.</p>
+    <p class="fine">Faro ofrece orientación descriptiva, no navegación segura. Puede equivocarse y no detecta todos los desniveles, vehículos, personas u obstáculos. No reemplaza al bastón, al perro guía, una app de navegación accesible ni a la ayuda de otra persona. La visión local usa TensorFlow.js y Tesseract.js; Gemini, de Google, es la opción gratuita de inteligencia artificial real para describir el entorno.</p>
   </div>
 </dialog>
 
@@ -345,8 +355,9 @@ const browserLang = (LANGS.find(l => l[0].toLowerCase() === String(navigator.lan
 const cfg = Object.assign({
   voice: true, rate: 1, voiceURI: '', lang: browserLang,
   autoListen: true, handsFree: false, vibrate: true,
-  ai: 'auto', geminiKey: '', geminiModel: 'gemini-flash-latest', sos: ''
+  ai: 'auto', brain: 'gemini', geminiKey: '', geminiModel: '', openaiKey: '', openaiModel: '', claudeKey: '', claudeModel: '', sos: ''
 }, store.get('cfg', {}));
+if (cfg.geminiModel === 'gemini-flash-latest') cfg.geminiModel = '';   // valor por defecto antiguo: hoy es lento y casi sin cuota gratuita
 const saveCfg = () => store.set('cfg', cfg);
 
 /* =====================================================================
@@ -1026,23 +1037,208 @@ const OCR = {
 /* =====================================================================
    9. INTELIGENCIA ARTIFICIAL EN LÍNEA
    ===================================================================== */
-const SYSTEM = 'Eres Faro, un asistente de voz en español para una persona ciega o con baja visión. Habla como un acompañante humano, cercano y respetuoso: lenguaje natural, frases claras y ritmo tranquilo. Tus respuestas se leen en voz alta: usa solo texto plano, sin markdown, emojis ni listas con símbolos; usa dos o tres oraciones salvo que te pidan más. Trata a la persona de tú. Si no sabes algo o no estás seguro, dilo con honestidad en vez de inventar. No prometas seguridad física ni des instrucciones de navegación que puedan poner en riesgo a alguien. La aplicación tiene comandos propios: activar cámara, qué ves, orientarme, leer texto, explorar, qué color es, linterna, qué hora es, dónde estoy, escucha y jugar; si te piden uno, sugiere el comando adecuado.';
+const SYSTEM = 'Eres Faro, un asistente de voz en español para una persona ciega o con baja visión. Habla como un acompañante humano, cercano y respetuoso: lenguaje natural, frases claras y ritmo tranquilo. Tus respuestas se leen en voz alta: usa solo texto plano, sin markdown, emojis ni listas con símbolos; usa dos o tres oraciones salvo que te pidan más. Trata a la persona de tú. Si no sabes algo o no estás seguro, dilo con honestidad en vez de inventar. No prometas seguridad física ni des instrucciones de navegación que puedan poner en riesgo a alguien.';
 const VISION_SYS = SYSTEM + ' Cuando recibas una imagen, eres los ojos de la persona: describe primero lo más importante y lo que esté más cerca, menciona objetos o posibles obstáculos solo si realmente son visibles, y usa posiciones como izquierda, derecha, al centro, cerca o lejos. Lee texto visible si lo hay. No digas "en la imagen" ni "en la foto". No identifiques a personas por su nombre. No afirmes que un camino está libre o que es seguro, y no indiques cruzar, avanzar o girar como una orden.';
-const VISUAL_RE = /\b(ves|ve|mira|miras|esto|este|esta|aqui|aca|color|delante|frente|foto|imagen|camara|mano|manos|cuantos|cuantas|que es|que dice|puesto|puesta|como (es|se ve|me veo|estoy))\b/;
+
+/* El cerebro no solo conversa: también decide cuándo usar una función de la aplicación.
+   Para pedirla responde "ACCION: código" y Faro ejecuta la frase equivalente de la tabla. */
+const ACTIONS = {
+  camara: 'activar cámara', camara_trasera: 'activar cámara trasera', camara_frontal: 'activar cámara frontal', camara_externa: 'activar cámara externa',
+  apagar_camara: 'apagar cámara', cambiar_camara: 'cambiar cámara', describir: 'qué ves', orientar: 'oriéntame', leer: 'leer texto',
+  explorar: 'explorar', detener_explorar: 'detener exploración', color: 'qué color es', luz: 'hay luz',
+  linterna_on: 'enciende la linterna', linterna_off: 'apaga la linterna',
+  hora: 'qué hora es', fecha: 'qué día es', bateria: 'batería', ubicacion: 'dónde estoy',
+  juegos: 'jugar', trivia: 'jugar trivia', adivinanzas: 'jugar adivinanzas', memoria: 'jugar memoria de sonidos', calculo: 'jugar cálculo mental',
+  palabras: 'jugar palabras encadenadas', tesoro: 'jugar búsqueda del tesoro', aventura: 'jugar aventura narrada', numero: 'jugar adivina el número',
+  manos_libres_on: 'activar manos libres', manos_libres_off: 'desactivar manos libres', mas_rapido: 'habla más rápido', mas_lento: 'habla más lento',
+  ayuda: 'ayuda', emergencia: 'emergencia', chiste: 'cuéntame un chiste'
+};
+const BRAIN_SYS = ' También eres el cerebro que maneja la aplicación. Cuando la persona pida algo que hace una función de la aplicación, no respondas con palabras: responde únicamente con una línea que diga ACCION: y el código de la función. Códigos disponibles: camara (encender la cámara sin decir cuál), camara_trasera, camara_frontal, camara_externa, apagar_camara, cambiar_camara, describir (saber qué hay delante o qué tiene en la mano), orientar (ubicarse o guiarse en el lugar), leer (leer un texto, cartel, envase, papel o pantalla), explorar (avisar objetos de forma continua), detener_explorar, color (saber un color), luz (saber si hay luz o está oscuro), linterna_on, linterna_off, hora, fecha, bateria, ubicacion (saber dónde está), juegos (quiere jugar sin decir a qué), trivia, adivinanzas, memoria, calculo, palabras, tesoro, aventura, numero (adivinar el número), manos_libres_on, manos_libres_off, mas_rapido, mas_lento, ayuda (saber qué puede hacer la aplicación), emergencia, chiste. Ejemplo: si dice "oye, ¿me puedes decir qué dice este papel?", respondes exactamente: ACCION: leer. Para todo lo demás, como preguntas, dudas o conversación, responde normalmente con palabras y sin usar ACCION.';
+const EYES_SYS = ' Junto con este mensaje recibes lo que la cámara ve en este momento. Si la pregunta se puede responder mirando, respóndela tú directamente, como los ojos de la persona, sin usar ACCION. Si la pregunta no tiene relación con lo que se ve, ignora la imagen.';
+const ACTION_RE = /ACCI[OÓ]N\s*:\s*\**\s*([a-z_]+)/i;
+
+/* Cerebros con clave. Cada uno prueba sus modelos en orden y recuerda el primero que responde. */
+const BRAINS = {
+  gemini: { name: 'Gemini', maker: 'Google', key: 'geminiKey', model: 'geminiModel',
+    // Flash-Lite primero: en la capa gratuita responde rápido y tiene cientos de consultas al día; Flash es más lento y tiene muy pocas.
+    models: ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest'],
+    link: 'https://aistudio.google.com/apikey', linkText: 'Crear una clave gratuita de Gemini en Google AI Studio',
+    help: 'Es gratuita y no pide tarjeta. Se crea con una cuenta de Google y queda guardada solo en este teléfono.' },
+  openai: { name: 'ChatGPT', maker: 'OpenAI', key: 'openaiKey', model: 'openaiModel',
+    models: ['gpt-4.1-mini', 'gpt-4o-mini', 'gpt-5-mini'],
+    link: 'https://platform.openai.com/api-keys', linkText: 'Crear una clave en la plataforma de OpenAI',
+    help: 'La clave de OpenAI es de pago: necesita saldo en la cuenta. Queda guardada solo en este teléfono.' },
+  claude: { name: 'Claude', maker: 'Anthropic', key: 'claudeKey', model: 'claudeModel',
+    models: ['claude-haiku-4-5', 'claude-haiku-5-5', 'claude-sonnet-5'],
+    link: 'https://console.anthropic.com/settings/keys', linkText: 'Crear una clave en la consola de Anthropic',
+    help: 'La clave de Anthropic es de pago: necesita saldo en la cuenta. Queda guardada solo en este teléfono.' }
+};
+const brainId = () => (BRAINS[cfg.brain] ? cfg.brain : 'gemini');
+const brainDef = () => BRAINS[brainId()];
+const brainKey = () => String(cfg[brainDef().key] || '').trim();
+
+/* Servicios sin clave: son la reserva cuando no hay cerebro configurado o no responde. Solo texto. */
 const FREE_AI = [
   { name: 'LLM7', url: 'https://api.llm7.io/v1/chat/completions', model: 'mistral-Nemo-Instruct-2407' },
   { name: 'LLM7', url: 'https://api.llm7.io/v1/chat/completions', model: 'gpt-oss:20b' },
   { name: 'Pollinations', url: 'https://text.pollinations.ai/openai', model: 'openai-fast', every: 46 }   // sin clave: una respuesta cada 45 segundos
 ];
-const AI = { history: [], canSee: () => !!cfg.geminiKey && cfg.ai !== 'local' };
+const AI = {
+  history: [], okModel: {}, notice: '', used: '',
+  smart: () => cfg.ai !== 'local' && !!brainKey(),     // hay un cerebro con clave
+  canSee: () => AI.smart()                             // los tres cerebros entienden imágenes
+};
+function remember(user, assistant) {
+  AI.history.push({ role: 'user', content: String(user).slice(0, 600) }, { role: 'assistant', content: String(assistant).slice(0, 1200) });
+  if (AI.history.length > 12) AI.history.splice(0, AI.history.length - 12);
+}
+/** Aviso pendiente (por ejemplo, clave rechazada) que se dice una sola vez, antes de la próxima respuesta. */
+function takeNotice() { const n = AI.notice; AI.notice = ''; return n ? n + ' ' : ''; }
 
 async function fetchT(url, options, ms) {
   const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), ms);
   try { return await fetch(url, Object.assign({ signal: ctrl.signal }, options)); }
   finally { clearTimeout(timer); }
 }
-/* Los servicios sin clave limitan el uso por minuto y por hora. Cuando uno avisa que
-   hay que esperar, se anota hasta cuándo y mientras tanto se usa el siguiente. */
+
+/* ---------- Cerebros con clave: Gemini, ChatGPT y Claude ---------- */
+function brainError(kind, message, extra) { const e = new Error(message); e.kind = kind; return Object.assign(e, extra || {}); }
+async function errBody(r) { try { return (await r.json()).error || {}; } catch (e) { return {}; } }
+/** Los tres servicios piden turnos alternados que empiecen por la persona. */
+function cleanTurns(messages) {
+  const out = [];
+  for (const m of messages) {
+    if (m.role === 'system' || !m.content) continue;
+    const last = out[out.length - 1];
+    if (last && last.role === m.role) last.content += '\n' + m.content;
+    else out.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content) });
+  }
+  while (out.length && out[0].role !== 'user') out.shift();
+  return out;
+}
+async function callGemini(model, key, sys, turns, image, ms) {
+  const contents = turns.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+  if (image) contents[contents.length - 1].parts.push({ inlineData: { mimeType: 'image/jpeg', data: image } });
+  const body = { contents, generationConfig: { temperature: .6 } };
+  if (sys) body.systemInstruction = { parts: [{ text: sys }] };
+  const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body)
+  }, ms);
+  if (!r.ok) {
+    const err = await errBody(r), all = JSON.stringify(err);
+    if (/API_KEY_INVALID|API key not valid|API key expired|API_KEY_SERVICE_BLOCKED/i.test(all) || r.status === 401 || r.status === 403) throw brainError('auth', 'Gemini no aceptó la clave');
+    if (r.status === 404) throw brainError('model', `Gemini no ofrece el modelo ${model}`);
+    if (r.status === 429) throw brainError('quota', `Gemini: se acabó la cuota de ${model}`, { wait: /PerDay/i.test(all) ? 3600 : Math.max(+((all.match(/"retryDelay":"(\d+)/) || [])[1]) || 30, 5) });
+    if (r.status >= 500) throw brainError('busy', 'Gemini está ocupado');
+    throw brainError('model', `Gemini respondió ${r.status}: ${err.message || ''}`);
+  }
+  const j = await r.json(), c = j.candidates && j.candidates[0];
+  const text = ((c && c.content && c.content.parts) || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+  if (!text) throw brainError((j.promptFeedback && j.promptFeedback.blockReason) || (c && /SAFETY|PROHIBITED|BLOCKLIST/.test(c.finishReason || '')) ? 'blocked' : 'busy', 'Gemini no entregó texto');
+  return text;
+}
+async function callOpenAI(model, key, sys, turns, image, ms) {
+  const messages = turns.map(m => ({ role: m.role, content: m.content }));
+  if (image) { const last = messages[messages.length - 1]; last.content = [{ type: 'text', text: last.content }, { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + image } }]; }
+  if (sys) messages.unshift({ role: 'system', content: sys });
+  const r = await fetchT('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key }, body: JSON.stringify({ model, messages })
+  }, ms);
+  if (!r.ok) {
+    const err = await errBody(r);
+    if (r.status === 401 || r.status === 403) throw brainError('auth', 'OpenAI no aceptó la clave');
+    if (r.status === 404 || err.code === 'model_not_found') throw brainError('model', `OpenAI no ofrece el modelo ${model}`);
+    if (r.status === 429) { const broke = err.code === 'insufficient_quota'; throw brainError('quota', broke ? 'La cuenta de OpenAI no tiene saldo' : 'OpenAI: límite de uso alcanzado', { wait: broke ? 3600 : 20, all: broke }); }
+    if (r.status >= 500) throw brainError('busy', 'OpenAI está ocupado');
+    throw brainError('model', `OpenAI respondió ${r.status}: ${err.message || ''}`);
+  }
+  const j = await r.json(), c = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  if (typeof c !== 'string' || !c.trim()) throw brainError('busy', 'OpenAI no entregó texto');
+  return c.trim();
+}
+async function callClaude(model, key, sys, turns, image, ms) {
+  const messages = turns.map(m => ({ role: m.role, content: m.content }));
+  if (image) { const last = messages[messages.length - 1]; last.content = [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } }, { type: 'text', text: last.content }]; }
+  const body = { model, max_tokens: 1024, messages };
+  if (sys) body.system = sys;
+  const r = await fetchT('https://api.anthropic.com/v1/messages', {
+    method: 'POST', body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
+  }, ms);
+  if (!r.ok) {
+    const err = await errBody(r);
+    if (r.status === 401 || r.status === 403) throw brainError('auth', 'Anthropic no aceptó la clave');
+    if (r.status === 404) throw brainError('model', `Anthropic no ofrece el modelo ${model}`);
+    if (/credit balance/i.test(err.message || '')) throw brainError('quota', 'La cuenta de Anthropic no tiene saldo', { wait: 3600, all: true });
+    if (r.status === 429) throw brainError('quota', 'Claude: límite de uso alcanzado', { wait: Math.max(+r.headers.get('retry-after') || 20, 5) });
+    if (r.status >= 500) throw brainError('busy', 'Claude está ocupado');
+    throw brainError('model', `Anthropic respondió ${r.status}: ${err.message || ''}`);
+  }
+  const j = await r.json();
+  const text = (j.content || []).filter(p => p.type === 'text').map(p => p.text || '').join('').trim();
+  if (!text) throw brainError(j.stop_reason === 'refusal' ? 'blocked' : 'busy', 'Claude no entregó texto');
+  return text;
+}
+const CALLERS = { gemini: callGemini, openai: callOpenAI, claude: callClaude };
+const modelCool = {};
+function resetBrain() {
+  AI.okModel = {}; AI.notice = '';
+  for (const k of Object.keys(modelCool)) delete modelCool[k];
+  for (const k of Object.keys(S.tips)) if (k.startsWith('brain_')) delete S.tips[k];
+}
+/** Pregunta al cerebro con clave. Devuelve el texto o lanza un error con .kind: auth, quota, model, busy, blocked o net. */
+async function smartCall(messages, image) {
+  const id = brainId(), def = BRAINS[id], key = brainKey();
+  if (!key) throw brainError('auth', `Falta la clave de ${def.name}`);
+  const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+  const turns = cleanTurns(messages);
+  if (!turns.length) throw brainError('model', 'No hay mensaje que enviar');
+  const wanted = [...new Set([String(cfg[def.model] || '').trim(), AI.okModel[id], ...def.models].filter(Boolean))];
+  const ready = wanted.filter(m => !(modelCool[id + ':' + m] > Date.now())).slice(0, 4);
+  let last = brainError('quota', `${def.name}: todos sus modelos están en pausa por límite de uso`);
+  const deadline = Date.now() + (image ? 45000 : 32000);
+  for (const model of ready) {
+    const left = deadline - Date.now();
+    if (left < 3000) break;
+    try {
+      const text = await CALLERS[id](model, key, sys, turns, image, Math.min(left, image ? 28000 : 20000));
+      AI.okModel[id] = model; AI.used = def.name;
+      return text;
+    } catch (e) {
+      last = e.kind ? e : brainError(e.name === 'AbortError' ? 'busy' : 'net', `${def.name}: ${e.name === 'AbortError' ? 'tardó demasiado en responder' : 'no hubo conexión'}`);
+      console.warn(last.message);
+      if (last.kind === 'quota') modelCool[id + ':' + model] = Date.now() + (last.wait || 30) * 1000;
+      if (last.kind === 'auth' || last.kind === 'blocked' || last.kind === 'net' || last.all) break;
+    }
+  }
+  throw last;
+}
+/** Explica en una frase por qué el cerebro no respondió. */
+function brainProblem(e) {
+  const def = brainDef(), n = def.name;
+  switch (e.kind) {
+    case 'auth': return brainKey() ? `${n} no aceptó la clave. Hay que copiarla de nuevo, completa y sin espacios, en Ajustes.` : `Falta la clave de ${n} en Ajustes.`;
+    case 'quota': return e.all ? `La cuenta de ${n} no tiene saldo disponible.` : `${n} llegó a su límite de uso por ahora.`;
+    case 'model': return `${n} no reconoció el modelo. En Ajustes, deja vacío el campo Modelo.`;
+    case 'blocked': return `${n} no quiso responder a esa consulta.`;
+    case 'net': return brainId() === 'openai' ? 'No pude conectar con OpenAI. Puede que la clave esté mal escrita o que no haya internet.' : `No pude conectar con ${n}. Revisa la conexión a internet.`;
+    default: return `${n} está ocupado o tardó demasiado.`;
+  }
+}
+/** El cerebro falló: se anota una vez por tipo de problema y se sigue con las alternativas. */
+function brainTrouble(e) {
+  console.warn(e.message);
+  const kind = e.kind || 'busy';
+  if (kind === 'blocked' || S.tips['brain_' + kind]) return;
+  S.tips['brain_' + kind] = true;
+  const msg = brainProblem(e);
+  note(msg + ' Sigo con las alternativas más simples.');
+  if (kind === 'auth' || kind === 'quota' || kind === 'model') AI.notice = 'Aviso: ' + msg + ' Mientras tanto uso una alternativa más simple.';
+}
+
+/* ---------- Servicios sin clave ---------- */
+/* Limitan el uso por minuto y por hora. Cuando uno avisa que hay que esperar,
+   se anota hasta cuándo y mientras tanto se usa el siguiente. */
 const cool = {};
 function aiWait() {
   const waits = Object.values(cool).map(t => t - Date.now()).filter(ms => ms > 0);
@@ -1066,42 +1262,25 @@ async function openaiStyle(p, messages) {
     const c = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
     if (typeof c !== 'string' || !c.trim()) throw new Error(p.name + ' sin contenido');
     if (p.every) cool[host] = Date.now() + p.every * 1000;
+    AI.used = p.name;
     return c;
   }
   throw new Error(p.name + ' ocupado');
 }
-async function gemini(messages, imageB64) {
-  const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
-  const contents = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
-  if (imageB64) contents[contents.length - 1].parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageB64 } });
-  const model = encodeURIComponent((cfg.geminiModel || 'gemini-flash-latest').trim());
-  const r = await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.geminiKey.trim() },
-    body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents, generationConfig: { temperature: .6 } })
-  }, 30000);
-  if (!r.ok) { const e = new Error('Gemini HTTP ' + r.status); e.status = r.status; throw e; }
-  const j = await r.json();
-  const parts = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-  const text = (parts || []).map(p => p.text || '').join('').trim();
-  if (!text) throw new Error('Gemini sin contenido');
-  return text;
-}
-function geminiTrouble(e) {
-  console.warn(e.message);
-  if (S.tips.key) return;
-  S.tips.key = true;
-  note(e.status === 400 || e.status === 401 || e.status === 403 ? 'La clave de Gemini no fue aceptada. Revísala en Ajustes.' : 'Gemini no respondió; uso las alternativas gratuitas.');
-}
-/** Respuesta de texto de la IA en línea, o null si no hay ninguna disponible. */
-async function aiText(messages) {
+async function freeText(messages) {
   if (cfg.ai === 'local' || navigator.onLine === false) return null;
-  if (cfg.geminiKey) { try { return await gemini(messages); } catch (e) { geminiTrouble(e); } }
   for (let round = 0; round < 2; round++) {
     for (const p of FREE_AI) { try { return await openaiStyle(p, messages); } catch (e) { console.warn(e.message); } }
     const w = aiWait();
     if (round === 0 && w > 0 && w <= 8) await sleep(w * 1000 + 300); else break;   // espera corta: vale la pena reintentar
   }
   return null;
+}
+/** Respuesta de texto: primero el cerebro con clave, después los servicios sin clave. Devuelve null si ninguno responde. */
+async function aiText(messages) {
+  if (cfg.ai === 'local' || navigator.onLine === false) return null;
+  if (AI.smart()) { try { return await smartCall(messages); } catch (e) { brainTrouble(e); } }
+  return freeText(messages);
 }
 function aiBusyText() {
   const w = aiWait();
@@ -1110,11 +1289,12 @@ function aiBusyText() {
   if (w) return `La inteligencia artificial gratuita tiene un límite de uso y ahora está en pausa. Podrá responder en unos ${w < 90 ? w + ' segundos' : Math.ceil(w / 60) + ' minutos'}.`;
   return 'En este momento no pude conectarme con la inteligencia artificial.';
 }
-/** Respuesta de la IA mirando la cámara. Solo con clave de Gemini. */
-async function aiVision(prompt, system) {
-  const c = Cam.frame(768);
-  if (!c) throw new Error('sin imagen');
-  return gemini([{ role: 'system', content: system || VISION_SYS }, { role: 'user', content: prompt }], c.toDataURL('image/jpeg', .75).split(',')[1]);
+const camShot = (size, quality) => { const c = Cam.frame(size || 768); return c ? c.toDataURL('image/jpeg', quality || .75).split(',')[1] : null; };
+/** El cerebro mira la cámara y responde. Necesita un cerebro con clave. */
+async function aiVision(prompt, system, size) {
+  const image = camShot(size);
+  if (!image) throw brainError('busy', 'La cámara no entregó imagen');
+  return smartCall([{ role: 'system', content: system || VISION_SYS }, { role: 'user', content: prompt }], image);
 }
 
 const JOKES = [
@@ -1153,28 +1333,49 @@ function localReply(raw) {
   return aiBusyText() + ' Mientras tanto puedo usar la cámara, decirte la hora, contarte un chiste o jugar contigo.';
 }
 
+/** Conversación libre. El cerebro responde con palabras o pide ejecutar una función de la aplicación. */
 async function chat(raw) {
   const my = S.op, alive = () => my === S.op;
   let reply = null;
-  if (cfg.ai !== 'local') {
+  if (cfg.ai !== 'local' && navigator.onLine !== false) {
     startThinking();
     const now = new Date();
-    const sys = `${SYSTEM} Fecha y hora local de la persona: ${now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ${now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}.`;
+    const when = ` Fecha y hora local de la persona: ${now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, ${now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}.`;
+    const blind = `${SYSTEM}${BRAIN_SYS} La cámara está ${Cam.active ? 'encendida, pero en este mensaje no recibes su imagen' : 'apagada'}.${when}`;
+    const turns = [...AI.history, { role: 'user', content: raw }];
     try {
-      if (Cam.active && AI.canSee() && VISUAL_RE.test(norm(raw))) {
-        try { reply = await aiVision(raw); } catch (e) { geminiTrouble(e); }
+      if (AI.smart()) {
+        const image = Cam.active ? camShot() : null;     // con la cámara encendida, el cerebro ve lo mismo que la persona tiene delante
+        try { reply = await smartCall([{ role: 'system', content: image ? VISION_SYS + BRAIN_SYS + EYES_SYS + when : blind }, ...turns], image); }
+        catch (e) { brainTrouble(e); }
       }
-      if (!reply) reply = await aiText([{ role: 'system', content: sys }, ...AI.history, { role: 'user', content: raw }]);
+      if (!reply && alive()) reply = await freeText([{ role: 'system', content: blind }, ...turns]);
     } catch (e) { console.warn(e); }
     stopThinking();
     if (!alive()) return;
   }
-  if (reply) {
-    reply = plain(reply);
-    AI.history.push({ role: 'user', content: raw }, { role: 'assistant', content: reply });
-    if (AI.history.length > 12) AI.history.splice(0, AI.history.length - 12);
-    await say(reply);
-  } else await say(localReply(raw));
+  if (!reply) return say(takeNotice() + localReply(raw));
+  const code = ((reply.match(ACTION_RE) || [])[1] || '').toLowerCase();
+  const phrase = ACTIONS[code];
+  if (phrase) {
+    const t = norm(phrase), it = findIntent(t);
+    if (it) { remember(raw, 'ACCION: ' + code); return it.run(t, raw); }
+  }
+  reply = plain(reply.replace(/ACCI[OÓ]N\s*:\s*\**\s*[a-z_]*/gi, ' ')).trim();
+  if (!reply) return say(takeNotice() + localReply(raw));
+  remember(raw, reply);
+  await say(takeNotice() + reply);
+}
+
+/** Dice qué inteligencia artificial está usando Faro. */
+async function brainStatus() {
+  const def = brainDef();
+  if (cfg.ai === 'local') return say('Estoy en modo solo dispositivo: no uso ninguna inteligencia artificial en línea. Se cambia en Ajustes.');
+  if (AI.smart()) {
+    const model = AI.okModel[brainId()];
+    return say(`Mi cerebro es ${def.name}, de ${def.maker}${model ? ', con el modelo ' + model.replace(/-/g, ' ') : ''}. Con él converso, entiendo lo que me pides con tus propias palabras y describo lo que ve la cámara.`);
+  }
+  await say('Ahora no tengo una clave de inteligencia artificial. Converso con servicios gratuitos más simples y reconozco objetos comunes con el propio teléfono. Con una clave gratuita de Gemini, de Google, que se agrega en Ajustes, puedo describir el entorno completo y entenderte mucho mejor.');
 }
 
 /* =====================================================================
@@ -1188,10 +1389,12 @@ async function describeScene(raw) {
     try {
       const r = await aiVision('Describe lo que hay frente a la cámara. ' + (raw && !/^(que ves|mira|describe)\W*$/i.test(norm(raw)) ? 'La persona preguntó: ' + raw : ''));
       stopThinking(); if (!alive()) return;
-      return say(plain(r));
-    } catch (e) { stopThinking(); if (!alive()) return; geminiTrouble(e); }
+      const seen = plain(r);
+      remember(raw || 'qué ves', seen);
+      return say(seen);
+    } catch (e) { stopThinking(); if (!alive()) return; brainTrouble(e); }
   }
-  if (!Vision.model) { await say('Estoy preparando la visión. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
+  if (!Vision.model) { await say(takeNotice() + 'Estoy preparando la visión. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
   startThinking();
   let preds;
   try { preds = await Vision.detect(.5); } catch (e) { stopThinking(); if (alive()) await say(VISION_ERR); return; }
@@ -1199,10 +1402,10 @@ async function describeScene(raw) {
   drawBoxes(preds);
   if (!S.exploring) setTimeout(() => { if (!S.exploring && !(S.game && S.game.usesBoxes)) clearBoxes(); }, 5000);
   const groups = summarize(preds);
-  let text = groups.length ? 'Veo ' + listJoin(groups.map(groupPhrase)) + '.'
-    : 'No reconozco ningún objeto conocido frente a la cámara. Prueba mover el teléfono lentamente o alejarlo un poco.';
+  let text = takeNotice() + (groups.length ? 'Veo ' + listJoin(groups.map(groupPhrase)) + '.'
+    : 'No reconozco ningún objeto conocido frente a la cámara. Prueba mover el teléfono lentamente o alejarlo un poco.');
   if (luminance().avg < 40) text += ' Hay muy poca luz. Puedes decir: enciende la linterna.';
-  if (!S.tips.vision && !cfg.geminiKey) { S.tips.vision = true; text += ' Te aviso que así solo reconozco objetos comunes, y puedo equivocarme.'; }
+  if (!S.tips.vision && !AI.smart()) { S.tips.vision = true; text += ' Te aviso que así solo reconozco objetos comunes, y puedo equivocarme.'; }
   await say(text);
 }
 
@@ -1218,10 +1421,11 @@ async function orientMe(raw) {
       const prompt = 'Da una orientación del entorno para una persona ciega. En dos o tres frases, describe primero la referencia u obstáculo visible más cercano y su posición relativa; después menciona referencias fijas o texto útil que realmente observes. Si hay poca certeza, dilo. No digas que el paso está libre, no confirmes seguridad, y no ordenes avanzar, cruzar o girar. ' + (raw ? 'Petición de la persona: ' + raw : '');
       const r = plain(await aiVision(prompt, VISION_SYS));
       stopThinking(); if (!alive()) return;
+      remember(raw || 'oriéntame', r);
       return say(r + ' ' + GUIDE_CAUTION);
-    } catch (e) { stopThinking(); if (!alive()) return; geminiTrouble(e); }
+    } catch (e) { stopThinking(); if (!alive()) return; brainTrouble(e); }
   }
-  if (!Vision.model) { await say('Estoy preparando el reconocimiento local. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
+  if (!Vision.model) { await say(takeNotice() + 'Estoy preparando el reconocimiento local. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
   startThinking();
   let preds;
   try { preds = await Vision.detect(.48); } catch (e) { stopThinking(); if (alive()) await say(VISION_ERR); return; }
@@ -1234,7 +1438,7 @@ async function orientMe(raw) {
   text += ' ' + GUIDE_CAUTION;
   if (!S.tips.geminiOrientation) {
     S.tips.geminiOrientation = true;
-    text += ' Para una descripción completa del entorno con IA real, agrega una clave gratuita de Gemini en Ajustes.';
+    if (!AI.smart()) text += ' Para una descripción completa del entorno con inteligencia artificial real, agrega una clave gratuita de Gemini en Ajustes.';
   }
   await say(text);
 }
@@ -1254,12 +1458,14 @@ async function readText() {
   if (AI.canSee()) {
     startThinking();
     try {
-      const r = plain(await aiVision('Lee el texto visible. Transcríbelo tal cual, en el orden natural de lectura, sin agregar comentarios ni explicaciones. Si no hay texto legible, responde únicamente: SIN TEXTO.', SYSTEM));
+      const r = plain(await aiVision('Lee el texto visible. Transcríbelo tal cual, en el orden natural de lectura, sin agregar comentarios ni explicaciones. Si no hay texto legible, responde únicamente: SIN TEXTO.', SYSTEM, 1280));
       stopThinking(); if (!alive()) return;
-      return say(/^sin texto/i.test(r) ? NO_TEXT : 'El texto dice: ' + r);
-    } catch (e) { stopThinking(); if (!alive()) return; geminiTrouble(e); }
+      if (/^sin texto/i.test(r)) return say(NO_TEXT);
+      remember('lee el texto que tengo delante', 'El texto dice: ' + r);
+      return say('El texto dice: ' + r);
+    } catch (e) { stopThinking(); if (!alive()) return; brainTrouble(e); }
   }
-  await say(OCR.worker ? 'Leyendo. Mantén el teléfono quieto.' : 'Voy a leer. La primera vez tardo más, porque preparo el lector de texto. Mantén el teléfono quieto.', { listen: false });
+  await say(takeNotice() + (OCR.worker ? 'Leyendo. Mantén el teléfono quieto.' : 'Voy a leer. La primera vez tardo más, porque preparo el lector de texto. Mantén el teléfono quieto.'), { listen: false });
   if (!alive() || !Cam.active) return;
   const canvas = Cam.frame(1600);
   startThinking();
@@ -1388,7 +1594,7 @@ async function sos() {
   await say('Abro el marcador con tu contacto de emergencia. Confirma la llamada en la pantalla.', { listen: false });
   try { window.location.href = 'tel:' + num; } catch (e) {}
 }
-const HELP = 'Puedo ayudarte con la cámara: di activar cámara, qué ves, orientarme, leer texto, explorar, qué color es, hay luz o linterna. Para que vuelva a atenderte, di escucha. Para informarte: qué hora es, qué día es, batería o dónde estoy. También puedes conversar conmigo, jugar o pedirme un chiste. Para interrumpirme, di detente.';
+const HELP = 'Puedo ayudarte con la cámara: di activar cámara, qué ves, orientarme, leer texto, explorar, qué color es, hay luz o linterna. Para que vuelva a atenderte, di escucha. Para informarte: qué hora es, qué día es, batería o dónde estoy. También puedes conversar conmigo, jugar o pedirme un chiste, y pedirme las cosas con tus propias palabras. Para saber qué inteligencia artificial uso, di: qué cerebro usas. Para interrumpirme, di detente.';
 
 /* =====================================================================
    11. JUEGOS
@@ -1879,6 +2085,7 @@ const INTENTS = [
   { id: 'handsfree', re: /\bmanos libres\b|\bescucha continua\b/, run: toggleHandsFree },
   { id: 'clear', re: /\b(borra|borrar|limpia|limpiar|elimina|eliminar) (la |el |todo el |toda la )?(conversacion|chat|historial|pantalla)\b/, run: clearChat },
   { id: 'sos', re: /\bemergencia\b|\bauxilio\b|\bsocorro\b|\bllama\w* a mi contacto\b/, run: sos },
+  { id: 'brain', re: /\b(que|cual) (cerebro|inteligencia( artificial)?|ia|modelo) (usas|tienes|estas usando|ocupas|eres)\b|\b(que|cual) es tu (cerebro|inteligencia( artificial)?|ia|modelo)\b|\bestado del cerebro\b|\b(eres|usas) (gemini|chatgpt|claude|gpt)\b/, run: brainStatus },
   { id: 'help', re: /^(ayuda|ayudame|comandos|instrucciones|menu)$|\bque (puedes|sabes) hacer\b|\bque comandos\b|\bcomo (te uso|funcionas|se usa)\b|\bque funciones\b/, run: () => say(HELP) },
   { id: 'joke', re: /\b(chiste|broma)\b/, run: () => say(pick(JOKES)) },
   { id: 'cancel', re: /^(cancelar|cancela|cancelalo|olvidalo)$/, run: () => say('No hay nada que cancelar. ¿Qué quieres hacer?') },
@@ -1941,7 +2148,49 @@ function fillVoiceSelect() {
 function syncSettings() {
   $('#sVoice').checked = cfg.voice; $('#sAuto').checked = cfg.autoListen; $('#sHands').checked = cfg.handsFree; $('#sVib').checked = cfg.vibrate;
   $('#sRate').value = cfg.rate; $('#sLang').value = cfg.lang; $('#sAI').value = cfg.ai;
-  $('#sKey').value = cfg.geminiKey; $('#sModel').value = cfg.geminiModel; $('#sSos').value = cfg.sos;
+  $('#sSos').value = cfg.sos; $('#sBrain').value = brainId();
+  syncBrainFields();
+}
+/** Los campos de clave y modelo muestran los del cerebro elegido. */
+function syncBrainFields() {
+  const def = brainDef();
+  $('#sKeyLabel').textContent = 'Clave de ' + def.name;
+  $('#sKeyHelp').textContent = def.help;
+  $('#sKeyLink').textContent = def.linkText; $('#sKeyLink').href = def.link;
+  $('#sKey').value = cfg[def.key] || ''; $('#sModel').value = cfg[def.model] || '';
+  $('#sProbeOut').textContent = '';
+}
+async function probeBrain() {
+  const out = $('#sProbeOut'), def = brainDef(), tell = text => { out.textContent = text; return say(text, { listen: false, log: false }); };
+  Sound.init();
+  if (!brainKey()) return tell(`Falta pegar la clave de ${def.name}.`);
+  if (navigator.onLine === false) return tell('No hay conexión a internet.');
+  out.textContent = `Probando ${def.name}…`;
+  try {
+    const r = plain(await smartCall([{ role: 'system', content: 'Responde en español, con una sola frase corta y sin formato.' }, { role: 'user', content: 'Saluda y di que el cerebro de Faro está conectado.' }]));
+    out.textContent = `Funciona. ${def.name} respondió con el modelo ${AI.okModel[brainId()]}: «${r}»`;
+    await say(`Funciona. ${def.name} dice: ${r}`, { listen: false, log: false });
+  } catch (e) { await tell(brainProblem(e)); }
+}
+async function shareKeyLink() {
+  const out = $('#sProbeOut');
+  if (!brainKey()) { out.textContent = `Primero pega la clave de ${brainDef().name}.`; return; }
+  const url = `${location.origin}${location.pathname}#${brainId()}=${encodeURIComponent(brainKey())}`;
+  try { await navigator.clipboard.writeText(url); out.textContent = 'Enlace copiado. Envíalo al otro teléfono y ábrelo allí: la clave quedará guardada.'; }
+  catch (e) { out.textContent = 'No pude copiarlo. Este es el enlace: ' + url; }
+}
+/** Un enlace como …/faro/#gemini=CLAVE deja la clave guardada sin tener que escribirla en este teléfono. */
+function importKeyFromLink() {
+  const m = /^#(gemini|openai|claude|clave)=(.+)$/.exec(location.hash || '');
+  if (!m) return;
+  const id = m[1] === 'clave' ? 'gemini' : m[1];
+  let key = m[2];
+  try { key = decodeURIComponent(key); } catch (e) {}
+  key = key.trim();
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  if (key.length < 10) return;
+  cfg.brain = id; cfg[BRAINS[id].key] = key; cfg.ai = 'auto'; saveCfg();
+  S.linkKey = BRAINS[id].name;
 }
 function applyCfg() {
   els.log.setAttribute('aria-live', cfg.voice ? 'off' : 'polite');
@@ -1955,9 +2204,13 @@ function bindSettings() {
   bind('#sVoice', 'voice', i => i.checked); bind('#sAuto', 'autoListen', i => i.checked);
   bind('#sHands', 'handsFree', i => i.checked); bind('#sVib', 'vibrate', i => i.checked);
   bind('#sRate', 'rate', i => +i.value); bind('#sLang', 'lang', i => i.value); bind('#sAI', 'ai', i => i.value);
-  bind('#sVoiceSel', 'voiceURI', i => i.value); bind('#sKey', 'geminiKey', i => i.value.trim());
-  bind('#sModel', 'geminiModel', i => i.value.trim() || 'gemini-flash-latest'); bind('#sSos', 'sos', i => i.value.trim());
-  $('#sKey').addEventListener('change', () => { S.tips.key = false; });
+  bind('#sVoiceSel', 'voiceURI', i => i.value); bind('#sSos', 'sos', i => i.value.trim());
+  $('#sBrain').addEventListener('change', e => { cfg.brain = e.target.value; saveCfg(); resetBrain(); syncBrainFields(); });
+  // Se guarda al escribir o pegar, sin esperar a que el campo pierda el foco.
+  $('#sKey').addEventListener('input', e => { cfg[brainDef().key] = e.target.value.trim(); saveCfg(); resetBrain(); });
+  $('#sModel').addEventListener('input', e => { cfg[brainDef().model] = e.target.value.trim(); saveCfg(); resetBrain(); });
+  $('#sProbe').addEventListener('click', probeBrain);
+  $('#sShare').addEventListener('click', shareKeyLink);
   $('#sTest').addEventListener('click', () => { Sound.init(); say('Hola, soy Faro. Así suena mi voz.', { listen: false, log: false }); });
   $('#btnSettings').addEventListener('click', () => { TTS.stop(); Ear.stop(); syncSettings(); fillVoiceSelect(); els.dlg.showModal(); });
   $('#dlgClose').addEventListener('click', () => els.dlg.close());
@@ -1976,6 +2229,10 @@ function beginFaro() {
   if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) countCameras();
   if (!window.isSecureContext || !navigator.mediaDevices) {
     note('La cámara y el micrófono necesitan una dirección segura que empiece con h t t p s.');
+  }
+  if (S.linkKey) {
+    note(`Clave de ${S.linkKey} guardada en este teléfono.`);
+    AI.notice = `Guardé la clave de ${S.linkKey}. Desde ahora es mi cerebro.`;
   }
   if (!Ear.supported) {
     note('No encuentro reconocimiento de voz en este navegador. Puedes escribir, o abrir Faro en Chrome para usar el micrófono.');
@@ -2035,6 +2292,7 @@ if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
 }
 
 TTS.load();
+importKeyFromLink();
 bindSettings();
 applyCfg();
 setState('idle');
@@ -2043,7 +2301,7 @@ setState('idle');
 setTimeout(beginFaro, 80);
 
 // Acceso para pruebas automáticas.
-window.__faro = { S, cfg, Cam, Vision, OCR, TTS, Ear, handleInput, orientMe, listenNow, beginFaro, parseNumber, colorName, norm, findIntent, mathLocal, timePhrase };
+window.__faro = { S, cfg, AI, BRAINS, ACTIONS, smartCall, resetBrain, Cam, Vision, OCR, TTS, Ear, handleInput, orientMe, listenNow, beginFaro, parseNumber, colorName, norm, findIntent, mathLocal, timePhrase };
 })();
 </script>
 </body>
