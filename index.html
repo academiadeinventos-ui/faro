@@ -138,8 +138,8 @@ input[type=range]{accent-color:var(--amber);min-height:44px}
 .switch:checked{background:var(--amber)}
 .switch:checked::after{transform:translateX(24px);background:var(--amber-ink)}
 .btn{min-height:46px;padding:0 1rem;border-radius:12px;border:1.5px solid var(--line);background:var(--surface2);font-weight:700}
-.fine{margin:1rem 0 0;font-size:.85rem;color:var(--muted)}
-.fine a{color:var(--amber)}
+.fine{margin:.7rem 0 0;color:var(--muted);font-size:.82rem;line-height:1.45}
+.ai-link a{color:var(--amber);font-weight:750;text-underline-offset:3px}
 
 @media (max-width:360px){:root{font-size:100%}.top{gap:.4rem;padding-left:.7rem;padding-right:.7rem}.stage{padding:0 .7rem}.mic{gap:.6rem;padding:.5rem .7rem}.mic-txt b{font-size:1.15rem}}
 @media (max-height:600px){.mic{min-height:72px}.mic-ico{width:46px;height:46px}.chip{min-height:46px}}
@@ -167,11 +167,9 @@ input[type=range]{accent-color:var(--amber);min-height:44px}
   </defs>
 </svg>
 
-<button id="start" class="start" type="button">
-  <svg aria-hidden="true"><use href="#i-logo"/></svg>
-  <span class="start-title">Faro</span>
-  <span class="start-sub">Asistente de voz para personas ciegas o con baja visión</span>
-  <span class="start-cta">Toca la pantalla para comenzar</span>
+<!-- Faro starts listening as soon as the page loads. This hidden fallback is useful only if a browser blocks automatic microphone access. -->
+<button id="start" class="start" type="button" hidden aria-hidden="true" tabindex="-1">
+  <span>Iniciar Faro</span>
 </button>
 
 <div class="app">
@@ -202,6 +200,7 @@ input[type=range]{accent-color:var(--amber);min-height:44px}
       <button class="chip" type="button" data-say="¿qué ves?"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg>¿Qué ves?</button>
       <button class="chip" type="button" data-say="leer texto"><svg class="ic" aria-hidden="true"><use href="#i-text"/></svg>Leer texto</button>
       <button class="chip" type="button" data-say="explorar"><svg class="ic" aria-hidden="true"><use href="#i-radar"/></svg>Explorar</button>
+      <button class="chip" type="button" data-say="orientarme"><svg class="ic" aria-hidden="true"><use href="#i-radar"/></svg>Orientarme</button>
       <button class="chip" type="button" data-say="¿qué color es?"><svg class="ic" aria-hidden="true"><use href="#i-drop"/></svg>Color</button>
       <button class="chip" type="button" data-say="jugar"><svg class="ic" aria-hidden="true"><use href="#i-game"/></svg>Juegos</button>
       <button class="chip" type="button" data-say="ayuda"><svg class="ic" aria-hidden="true"><use href="#i-help"/></svg>Ayuda</button>
@@ -242,14 +241,15 @@ input[type=range]{accent-color:var(--amber);min-height:44px}
     <fieldset>
       <legend>Inteligencia artificial</legend>
       <div class="row wide"><label for="sAI">Conversación</label><select id="sAI"><option value="auto">IA gratis en línea</option><option value="local">Solo en el dispositivo</option></select></div>
-      <div class="stack"><label for="sKey">Clave de Gemini (opcional)<small>Con una clave gratuita de Google AI Studio, Faro describe escenas completas y lee mejor los textos. Se guarda solo en este dispositivo.</small></label><input id="sKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí la clave"></div>
+      <div class="stack"><label for="sKey">Clave gratuita de Gemini para visión real<small>Gemini analiza una foto de la cámara y puede describir el entorno completo. La clave gratuita se crea en Google AI Studio y queda guardada solo en este teléfono.</small></label><input id="sKey" type="password" autocomplete="off" spellcheck="false" placeholder="Pega aquí la clave gratuita"></div>
+      <p class="fine ai-link"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Crear una clave gratis de Gemini en Google AI Studio</a><br>Sin clave, Faro sigue reconociendo objetos comunes en el propio teléfono con TensorFlow.</p>
       <div class="stack"><label for="sModel">Modelo de Gemini</label><input id="sModel" type="text" autocomplete="off" spellcheck="false"></div>
     </fieldset>
     <fieldset>
       <legend>Emergencia</legend>
       <div class="stack"><label for="sSos">Teléfono de contacto<small>Al decir «emergencia» se abre el marcador con este número.</small></label><input id="sSos" type="tel" inputmode="tel" autocomplete="off" placeholder="+56 9 1234 5678"></div>
     </fieldset>
-    <p class="fine">Faro reconoce objetos comunes y puede equivocarse. No reemplaza al bastón, al perro guía ni a la ayuda de otra persona. La visión del dispositivo usa TensorFlow.js y Tesseract.js; la conversación sin clave usa los servicios gratuitos LLM7 y Pollinations.</p>
+    <p class="fine">Faro ofrece orientación descriptiva, no navegación segura. Puede equivocarse y no detecta todos los desniveles, vehículos, personas u obstáculos. No reemplaza al bastón, al perro guía, una app de navegación accesible ni a la ayuda de otra persona. La visión local usa TensorFlow.js y Tesseract.js; Gemini es la opción gratuita de IA real para describir el entorno.</p>
   </div>
 </dialog>
 
@@ -363,7 +363,7 @@ const ui = { state: 'idle' };
 let lastSource = 'button';
 
 const STATE_TEXT = {
-  idle: ['En espera', 'Toca para hablar', 'o escribe arriba'],
+  idle: ['En espera', 'Di “escucha”', 'o toca para hablar'],
   listening: ['Escuchando', 'Escuchando…', 'habla ahora'],
   speaking: ['Hablando', 'Hablando…', 'toca para interrumpir'],
   thinking: ['Pensando', 'Pensando…', 'un momento']
@@ -449,10 +449,14 @@ const TTS = {
   voice() {
     const vs = this.voices; if (!vs.length) return null;
     if (cfg.voiceURI) { const v = vs.find(v => v.voiceURI === cfg.voiceURI); if (v) return v; }
-    for (const want of [cfg.lang, 'es-CL', 'es-419', 'es-US', 'es-MX', 'es-AR', 'es-ES']) {
-      const v = vs.find(v => v.lang.replace('_', '-').toLowerCase() === want.toLowerCase()); if (v) return v;
-    }
-    return vs[0];
+    const wants = [cfg.lang, 'es-CL', 'es-419', 'es-US', 'es-MX', 'es-AR', 'es-ES'];
+    const score = v => {
+      const lang = v.lang.replace('_', '-').toLowerCase();
+      const pos = wants.map(x => x.toLowerCase()).indexOf(lang);
+      const natural = /natural|neural|enhanced|premium|google|microsoft|online/i.test(v.name || '') ? 12 : 0;
+      return (pos < 0 ? 0 : 100 - pos * 8) + natural;
+    };
+    return vs.slice().sort((a, b) => score(b) - score(a))[0];
   },
   /** Trozos cortos: algunos navegadores cortan las frases largas. */
   chunks(text) {
@@ -480,6 +484,9 @@ const TTS = {
     const parts = this.chunks(text);
     if (!parts.length) return true;
     this.speaking = true; setState('speaking');
+    // Mientras Faro habla, deja un reconocimiento muy limitado para «detente».
+    // Es una ayuda de interrupción; el reconocimiento normal vuelve al terminar.
+    if (typeof Ear !== 'undefined') Ear.listenForStop();
     await sleep(60);
     for (const part of parts) {
       if (my !== this.token) return false;
@@ -487,7 +494,8 @@ const TTS = {
         const u = new SpeechSynthesisUtterance(part);
         const v = this.voice();
         if (v) { u.voice = v; u.lang = v.lang; } else u.lang = cfg.lang;
-        u.rate = cfg.rate; u.pitch = 1; u.volume = 1;
+        // A barely warmer pitch avoids a robotic cadence while preserving the selected phone voice.
+        u.rate = cfg.rate; u.pitch = 1.04; u.volume = 1;
         let done = false;
         const fin = () => { if (!done) { done = true; clearTimeout(guard); res(); } };
         const guard = setTimeout(fin, 2500 + part.length * 110 / Math.max(.5, cfg.rate));
@@ -498,11 +506,13 @@ const TTS = {
     }
     if (my !== this.token) return false;
     this.speaking = false;
+    if (typeof Ear !== 'undefined') Ear.stopInterrupt();
     if (ui.state === 'speaking') setState('idle');
     return true;
   },
   stop() {
     this.token++;
+    if (typeof Ear !== 'undefined') Ear.stopInterrupt();
     if (this.speaking) { this.speaking = false; if (ui.state === 'speaking') setState('idle'); }
     if (this.ok) { try { speechSynthesis.cancel(); } catch (e) {} }
   }
@@ -513,7 +523,35 @@ const TTS = {
    ===================================================================== */
 const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
 const Ear = {
-  supported: !!SRClass, rec: null, on: false, hearing: false, denied: false,
+  supported: !!SRClass, rec: null, on: false, hearing: false, denied: false, interruptRec: null,
+  /** Escucha solo la palabra de corte mientras la síntesis está hablando.
+      En altavoz depende de la cancelación de eco del teléfono; con audífonos es más fiable. */
+  listenForStop() {
+    if (!this.supported || this.denied || this.interruptRec || document.hidden || !TTS.speaking) return;
+    let r;
+    try { r = new SRClass(); } catch (e) { return; }
+    this.interruptRec = r;
+    r.lang = cfg.lang; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = e => {
+      let heard = '';
+      for (let i = 0; i < e.results.length; i++) heard += (e.results[i][0] && e.results[i][0].transcript || '') + ' ';
+      // Se acepta solo una orden completa: no se confunde con frases corrientes de Faro.
+      if (/^(detente|detener|deten|silencio|callate|calla|alto|stop)( faro| ya| por favor| todo)*$/.test(norm(heard))) {
+        if (this.interruptRec === r) this.interruptRec = null;
+        try { r.abort(); } catch (e2) {}
+        stopAll();
+      }
+    };
+    r.onerror = () => {};
+    r.onend = () => { if (this.interruptRec === r) this.interruptRec = null; };
+    try { r.start(); } catch (e) { if (this.interruptRec === r) this.interruptRec = null; }
+  },
+  stopInterrupt() {
+    const r = this.interruptRec;
+    if (!r) return;
+    this.interruptRec = null;
+    try { r.abort(); } catch (e) {}
+  },
   start() {
     if (!this.supported || this.on || this.denied || document.hidden) return;
     let r;
@@ -553,6 +591,7 @@ const Ear = {
   },
   /** Corta sin procesar lo que se estaba oyendo. */
   stop() {
+    this.stopInterrupt();
     const r = this.rec; if (!r) return;
     r._silence(); this.rec = null; this.on = false; this.hearing = false;
     els.heard.textContent = '';
@@ -987,8 +1026,8 @@ const OCR = {
 /* =====================================================================
    9. INTELIGENCIA ARTIFICIAL EN LÍNEA
    ===================================================================== */
-const SYSTEM = 'Eres Faro, un asistente de voz en español para personas ciegas o con baja visión. Tus respuestas se leen en voz alta: usa solo texto plano, sin markdown, sin emojis y sin listas con símbolos. Sé breve, claro y cálido: como máximo tres o cuatro oraciones, salvo que te pidan más detalle. Trata a la persona de tú. Si no sabes algo o no estás seguro, dilo con honestidad en vez de inventar. La aplicación tiene comandos de voz propios: activar cámara, qué ves, leer texto, explorar, qué color es, linterna, qué hora es, dónde estoy y jugar; si te piden algo de eso, sugiere decir el comando.';
-const VISION_SYS = SYSTEM + ' Cuando recibas una imagen, eres los ojos de la persona: describe primero lo más importante y lo que esté más cerca, menciona obstáculos o peligros, usa posiciones como izquierda, derecha, al centro, cerca o lejos, y lee el texto visible si lo hay. No digas "en la imagen" ni "en la foto". No identifiques a personas por su nombre.';
+const SYSTEM = 'Eres Faro, un asistente de voz en español para una persona ciega o con baja visión. Habla como un acompañante humano, cercano y respetuoso: lenguaje natural, frases claras y ritmo tranquilo. Tus respuestas se leen en voz alta: usa solo texto plano, sin markdown, emojis ni listas con símbolos; usa dos o tres oraciones salvo que te pidan más. Trata a la persona de tú. Si no sabes algo o no estás seguro, dilo con honestidad en vez de inventar. No prometas seguridad física ni des instrucciones de navegación que puedan poner en riesgo a alguien. La aplicación tiene comandos propios: activar cámara, qué ves, orientarme, leer texto, explorar, qué color es, linterna, qué hora es, dónde estoy, escucha y jugar; si te piden uno, sugiere el comando adecuado.';
+const VISION_SYS = SYSTEM + ' Cuando recibas una imagen, eres los ojos de la persona: describe primero lo más importante y lo que esté más cerca, menciona objetos o posibles obstáculos solo si realmente son visibles, y usa posiciones como izquierda, derecha, al centro, cerca o lejos. Lee texto visible si lo hay. No digas "en la imagen" ni "en la foto". No identifiques a personas por su nombre. No afirmes que un camino está libre o que es seguro, y no indiques cruzar, avanzar o girar como una orden.';
 const VISUAL_RE = /\b(ves|ve|mira|miras|esto|este|esta|aqui|aca|color|delante|frente|foto|imagen|camara|mano|manos|cuantos|cuantas|que es|que dice|puesto|puesta|como (es|se ve|me veo|estoy))\b/;
 const FREE_AI = [
   { name: 'LLM7', url: 'https://api.llm7.io/v1/chat/completions', model: 'mistral-Nemo-Instruct-2407' },
@@ -1167,6 +1206,47 @@ async function describeScene(raw) {
   await say(text);
 }
 
+const GUIDE_CAUTION = 'Es una orientación aproximada: no confirma que el camino esté libre. Verifica siempre con tu bastón o perro guía y detente ante cualquier duda.';
+
+/** Orientación breve: Gemini interpreta el entorno completo; sin clave se conserva una alternativa local y honesta. */
+async function orientMe(raw) {
+  if (!(await ensureCamera())) return;
+  const my = S.op, alive = () => my === S.op;
+  if (AI.canSee()) {
+    startThinking();
+    try {
+      const prompt = 'Da una orientación del entorno para una persona ciega. En dos o tres frases, describe primero la referencia u obstáculo visible más cercano y su posición relativa; después menciona referencias fijas o texto útil que realmente observes. Si hay poca certeza, dilo. No digas que el paso está libre, no confirmes seguridad, y no ordenes avanzar, cruzar o girar. ' + (raw ? 'Petición de la persona: ' + raw : '');
+      const r = plain(await aiVision(prompt, VISION_SYS));
+      stopThinking(); if (!alive()) return;
+      return say(r + ' ' + GUIDE_CAUTION);
+    } catch (e) { stopThinking(); if (!alive()) return; geminiTrouble(e); }
+  }
+  if (!Vision.model) { await say('Estoy preparando el reconocimiento local. La primera vez tarda unos segundos.', { listen: false }); if (!alive()) return; }
+  startThinking();
+  let preds;
+  try { preds = await Vision.detect(.48); } catch (e) { stopThinking(); if (alive()) await say(VISION_ERR); return; }
+  stopThinking(); if (!alive()) return;
+  const groups = summarize(preds);
+  let text = groups.length
+    ? 'Orientación local: detecto ' + listJoin(groups.map(groupPhrase)) + '.'
+    : 'No identifico una referencia confiable frente a la cámara. Mueve el teléfono lentamente y vuelve a intentarlo.';
+  if (luminance().avg < 40) text += ' Hay poca luz, por lo que el resultado puede ser menos fiable.';
+  text += ' ' + GUIDE_CAUTION;
+  if (!S.tips.geminiOrientation) {
+    S.tips.geminiOrientation = true;
+    text += ' Para una descripción completa del entorno con IA real, agrega una clave gratuita de Gemini en Ajustes.';
+  }
+  await say(text);
+}
+
+async function listenNow() {
+  stopThinking(); TTS.stop();
+  if (!Ear.supported) return say('Este navegador no puede escuchar por voz. En Chrome o Safari puedes usar el micrófono; aquí también puedes escribir.', { listen: false });
+  Ear.denied = false;
+  lastSource = 'voice';
+  await say('Te escucho.', { listen: true });
+}
+
 async function readText() {
   if (!(await ensureCamera())) return;
   const my = S.op, alive = () => my === S.op;
@@ -1308,7 +1388,7 @@ async function sos() {
   await say('Abro el marcador con tu contacto de emergencia. Confirma la llamada en la pantalla.', { listen: false });
   try { window.location.href = 'tel:' + num; } catch (e) {}
 }
-const HELP = 'Esto es lo que puedes pedirme. Para ver: activar cámara, qué ves, leer texto, explorar, qué color es, hay luz, y linterna. Para informarte: qué hora es, qué día es, batería, y dónde estoy. Para pasarlo bien: jugar, o cuéntame un chiste. También puedes conversar conmigo sobre cualquier tema. En cualquier momento di repite para escucharme otra vez, o silencio para que me calle.';
+const HELP = 'Puedo ayudarte con la cámara: di activar cámara, qué ves, orientarme, leer texto, explorar, qué color es, hay luz o linterna. Para que vuelva a atenderte, di escucha. Para informarte: qué hora es, qué día es, batería o dónde estoy. También puedes conversar conmigo, jugar o pedirme un chiste. Para interrumpirme, di detente.';
 
 /* =====================================================================
    11. JUEGOS
@@ -1787,6 +1867,7 @@ const INTENTS = [
   { id: 'read', re: /^(lee|leer|leeme|lea|leelo)\b|\b(lee|leer|leeme) (el |este |la |esta |un |lo |lo que dice )?(texto|cartel|letrero|papel|etiqueta|documento|carta|libro|envase|caja|pantalla)\b|\bque dice (aqui|aca|esto|el|la|este|esta)\b|^que dice$/, run: readText },
   { id: 'color', re: /\b(que|cual|de que) color\b|^color(es)?$|\bdetect\w* (el )?color\b|\bdime el color\b/, run: tellColor },
   { id: 'light', re: /\bhay luz\b|\besta (oscuro|claro)\b|\b(esta|estan) (prendida|encendida|apagada)s? las? luz\b|\b(nivel|cantidad) de luz\b|\bluz (esta )?(encendida|prendida|apagada)\b|\bcuanta luz\b/, run: tellLight },
+  { id: 'orient', re: /^(orientame|orientarme|orientar|guiame|guiarme|guia|dame orientacion|orientacion|como esta el (entorno|lugar|camino))$|\b(orientame|orientarme|guiame|guiarme|dame orientacion|describe.*(?:entorno|alrededor)|ayudame a orientarme)\b/, run: (t, raw) => orientMe(raw) },
   { id: 'describe', re: /\bque (ves|estas viendo|se ve|miras|observas)\b|\bque hay (aqui|aca|delante|adelante|al frente|enfrente|en frente|frente a mi|alrededor)\b|\bque tengo (delante|adelante|al frente|enfrente|en frente|en la mano|en mis manos)\b|\bdescrib\w* (lo que (ves|hay)|la (escena|imagen|habitacion|pieza)|el (lugar|entorno|ambiente)|mi entorno|esto|que ves)\b|^describ\w*$|\bque es esto\b|^mira( esto)?$|\bque estoy (viendo|apuntando|sosteniendo|mostrando)\b|\bdime (lo )?que ves\b/, run: (t, raw) => describeScene(raw) },
   { id: 'time', re: /\bque hora\b|^(la )?hora$|\bdime la hora\b/, run: tellTime },
   { id: 'date', re: /\bque (dia|fecha)\b|^(la )?fecha$|\ba cuanto estamos\b/, run: tellDate },
@@ -1794,6 +1875,7 @@ const INTENTS = [
   { id: 'where', re: /\bdonde estoy\b|\bmi ubicacion\b|\bubicacion actual\b|\ben que (calle|lugar|ciudad|direccion) estoy\b|\bdonde me encuentro\b/, run: tellLocation },
   { id: 'games', re: /\b(jugar|juguemos|juega conmigo|vamos a jugar)\b|^(juegos?|un juego|otro juego|lista de juegos|que juegos (tienes|hay))$|^(trivia|adivinanzas?|memoria( de sonidos)?|calculo( mental)?|palabras encadenadas|busqueda del tesoro|aventura( narrada)?|adivina el numero)$/, run: gamesEntry },
   { id: 'rate', re: /\b(habla|hable|hablar|hablame) (mas |un poco mas |muy )?(rapido|lento|despacio|normal)\b|^mas (rapido|lento|despacio)$|\bvelocidad normal\b/, run: setRateByVoice },
+  { id: 'listen', re: /^(escucha|escuchar|escuchame|oye|atencion|pon atencion|vuelve a escuchar)$|\bempieza a escuchar\b/, run: listenNow },
   { id: 'handsfree', re: /\bmanos libres\b|\bescucha continua\b/, run: toggleHandsFree },
   { id: 'clear', re: /\b(borra|borrar|limpia|limpiar|elimina|eliminar) (la |el |todo el |toda la )?(conversacion|chat|historial|pantalla)\b/, run: clearChat },
   { id: 'sos', re: /\bemergencia\b|\bauxilio\b|\bsocorro\b|\bllama\w* a mi contacto\b/, run: sos },
@@ -1811,7 +1893,8 @@ function stopAll() {
   const wasExploring = S.exploring; S.exploring = false;
   if (S.pending) { const r = S.pending; S.pending = null; hideCard(); r({ t: 'cancelar', raw: '', silent: true }); }
   setState('idle');
-  if (wasExploring) say('Exploración detenida.', { listen: false }); else Sound.done();
+  if (wasExploring) note('Exploración detenida.');
+  Sound.done();
 }
 
 /** Punto de entrada único: todo lo que la persona dice, escribe o toca pasa por aquí. */
@@ -1824,9 +1907,10 @@ async function handleInput(raw, source) {
   const t = norm(raw);
   if (!t) return;
   try {
+    // Stop is always an emergency-style interruption, including inside a greedy game.
+    if (STOP_RE.test(t)) return stopAll();
     const greedy = S.game && S.game.greedy && !S.pending;
     if (!greedy) {
-      if (STOP_RE.test(t)) return stopAll();
       if (REPEAT_RE.test(t)) {
         if (S.game && !S.pending && S.game.repeat) return await S.game.repeat();
         if (S.lastSaid) return await say(S.lastSaid, { log: false });
@@ -1885,24 +1969,24 @@ function bindSettings() {
 /* =====================================================================
    14. INICIO Y EVENTOS
    ===================================================================== */
-els.start.addEventListener('click', async () => {
-  Sound.init();
-  // iOS exige que la primera frase se lance dentro del toque.
-  if (TTS.ok) { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {} }
-  els.start.remove();
+function beginFaro() {
+  if (S.started) return;
   S.started = true;
-  els.mic.focus({ preventScroll: true });
+  if (els.start) els.start.hidden = true;
   if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) countCameras();
-  if (!window.isSecureContext || !navigator.mediaDevices) note('La cámara y el micrófono necesitan una dirección segura (https).');
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    note('La cámara y el micrófono necesitan una dirección segura que empiece con h t t p s.');
+  }
+  if (!Ear.supported) {
+    note('No encuentro reconocimiento de voz en este navegador. Puedes escribir, o abrir Faro en Chrome para usar el micrófono.');
+    return;
+  }
   lastSource = 'voice';
-  const first = !store.get('seen', false);
-  store.set('seen', true);
-  let hello = first
-    ? 'Hola, soy Faro, tu asistente de voz. El botón para hablar ocupa todo el ancho de la parte de abajo de la pantalla. Puedo activar la cámara y decirte lo que hay delante, leer textos, decirte la hora, conversar y jugar contigo. Di ayuda para conocer todos los comandos.'
-    : 'Hola de nuevo, soy Faro.';
-  if (!Ear.supported) hello += ' En este navegador no puedo escucharte, pero puedes escribirme. Para usar la voz, abre esta página en Chrome.';
-  await say(hello + ' ¿Qué quieres hacer?');
-});
+  // No saludo hablado al abrir: la primera prioridad es atender de inmediato.
+  note('Faro ya está escuchando. Puedes decir ayuda, activar cámara, orientarme o escucha.');
+  Ear.start();
+}
+if (els.start) els.start.addEventListener('click', beginFaro);
 
 els.mic.addEventListener('click', () => {
   Sound.init();
@@ -1954,9 +2038,12 @@ TTS.load();
 bindSettings();
 applyCfg();
 setState('idle');
+// Al abrir directamente bajo HTTPS, el navegador solicitará el micrófono y Faro comenzará a escuchar.
+// Algunos navegadores pueden exigir un toque para conceder el permiso la primera vez.
+setTimeout(beginFaro, 80);
 
 // Acceso para pruebas automáticas.
-window.__faro = { S, cfg, Cam, Vision, OCR, TTS, Ear, handleInput, parseNumber, colorName, norm, findIntent, mathLocal, timePhrase };
+window.__faro = { S, cfg, Cam, Vision, OCR, TTS, Ear, handleInput, orientMe, listenNow, beginFaro, parseNumber, colorName, norm, findIntent, mathLocal, timePhrase };
 })();
 </script>
 </body>
